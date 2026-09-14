@@ -2,11 +2,24 @@
 
 A consuming repository should keep its project-specific demo or documentation home page authoritative and use the shared generator for standardized evidence routes.
 
-1. Pin `github-pages-template` to an exact revision in the consumer toolchain.
-2. Add a repository-owned `pages.config.json` describing identity, base path, links, and evidence source URLs.
-3. Build the existing project site normally.
-4. Run `github-pages-template build --config ./pages.config.json --out ./dist --augment`.
-5. Publish `dist/` with `reusable-workflows`.
+## Canonical dependency
+
+Released consumers should install the public npm package rather than cloning this repository during CI:
+
+```sh
+npm install --save-dev @moritzbrantner/github-pages-template
+```
+
+Use the repository's normal package manager when it is not npm, and commit the resulting lockfile. The package version is the update surface; the lockfile preserves the exact resolved package artifact and integrity hash. Renovate should update this dependency like other package dependencies.
+
+A direct Git revision is acceptable only as a short-lived integration path for an unreleased template change. Do not leave permanent custom `git fetch` logic in consumer workflows once that change has a package release.
+
+## Build integration
+
+1. Add a repository-owned `pages.config.json` describing identity, base path, links, and evidence source URLs.
+2. Build the existing project site normally.
+3. Run `github-pages-template build --config ./pages.config.json --out ./dist --augment` from the installed package.
+4. Publish `dist/` with `reusable-workflows`.
 
 ## Augment output ownership
 
