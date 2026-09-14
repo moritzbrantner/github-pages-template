@@ -19,7 +19,5 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: "24"
-      - name: Test generator
-        run: node --test
-      - name: Build reference site
-        run: node ./bin/github-pages-template.mjs build --config ./site/pages.config.json --out ./dist
+      - name: Verify release contract
+        run: npm run verify:release

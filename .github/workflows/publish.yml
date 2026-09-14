@@ -1,0 +1,93 @@
+name: Publish package
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-package
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Verify and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: npm
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Verify release contract
+        run: npm run verify:release
+
+      - name: Verify tag matches package version
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        run: node ./scripts/verify-release.mjs "$GITHUB_REF_NAME"
+
+      - name: Dry-run package publish
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: npm publish --dry-run --access public --registry https://registry.npmjs.org --ignore-scripts
+
+      - name: Check whether version is already published
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        id: registry
+        run: |
+          package_name="$(node -p "require('./package.json').name")"
+          package_version="$(node -p "require('./package.json').version")"
+          if npm view "${package_name}@${package_version}" version --registry https://registry.npmjs.org >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "${package_name}@${package_version} is already present on npm; upload will be skipped."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish package
+        if: ${{ startsWith(github.ref, 'refs/tags/v') && steps.registry.outputs.exists != 'true' }}
+        run: |
+          set +e
+          unset NODE_AUTH_TOKEN
+          npm publish --access public --registry https://registry.npmjs.org --provenance
+          publish_status=$?
+
+          if [ "$publish_status" -ne 0 ] && [ -n "$NPM_PUBLISH_TOKEN" ]; then
+            echo "Trusted publishing did not complete; retrying with the bootstrap NPM_TOKEN."
+            NODE_AUTH_TOKEN="$NPM_PUBLISH_TOKEN" npm publish --access public --registry https://registry.npmjs.org --provenance
+            publish_status=$?
+          fi
+
+          if [ "$publish_status" -ne 0 ]; then
+            {
+              echo "### npm publish failed"
+              echo ""
+              echo "For the first release, the package must be created with an npm token because npm trusted publishing can only be configured after the package exists."
+              echo "Add an npm publish token as the \`NPM_TOKEN\` secret on the \`npm\` environment, rerun this tag workflow, then configure trusted publishing for \`publish.yml\` and remove the bootstrap token."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit "$publish_status"
+          fi
+        env:
+          NPM_PUBLISH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub release
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "GitHub release $GITHUB_REF_NAME already exists."
+          else
+            gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes
+          fi

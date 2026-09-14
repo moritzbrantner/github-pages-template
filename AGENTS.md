@@ -17,3 +17,11 @@
 - Prefer stable URL-addressable routes (`/stats/`, `/evidence/`) over SPA-only state.
 - Keep GitHub project-site base paths explicit and tested.
 - Favor semantic HTML, keyboard access, reduced-motion behavior, and responsive layouts.
+
+## Distribution
+
+- Public npm package `@moritzbrantner/github-pages-template` is the canonical released consumer surface.
+- Keep `package.json` and `VERSION` synchronized and require release tags to match `v<version>` exactly.
+- Validate the real npm pack payload before publishing; repository-only tests, workflows, scripts, reference-site input, and generated reference output must not leak into the package.
+- Prefer npm trusted publishing with provenance. A long-lived `NPM_TOKEN` is only an initial-package bootstrap fallback and should be removed after trusted publishing is established.
+- Consumer repositories should use the package dependency plus their lockfile and Renovate rather than permanent repository-specific source-fetch logic.
