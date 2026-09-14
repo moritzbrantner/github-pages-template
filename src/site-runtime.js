@@ -1,4 +1,7 @@
-import { acceptCodingToolingAnalysisMessage } from "./evidence-source.js";
+import {
+  acceptCodingToolingAnalysisMessage,
+  reconcileProjectEvidenceFreshness,
+} from "./evidence-source.js";
 
 const config = window.__PROJECT_PAGES_CONFIG__;
 const page = document.body.dataset.page;
@@ -8,7 +11,8 @@ if (config && (page === "stats" || page === "evidence")) {
 }
 
 async function loadEvidence() {
-  const sources = await Promise.all((config.evidenceSources ?? []).map(readSource));
+  let sources = await Promise.all((config.evidenceSources ?? []).map(readSource));
+  sources = reconcileProjectEvidenceFreshness(sources, config.project.repository);
   if (page === "stats") renderStats(sources);
   if (page === "evidence") renderEvidence(sources);
 }
@@ -108,16 +112,16 @@ function normalizeProjectEvidence(payload) {
       accomplishments: [],
     };
   }
-  const freshness = payload.freshness ?? "unknown";
-  const status = payload.status ?? "current";
+  const status = payload.status ?? "unknown";
   return {
-    state: joinState(status, freshness),
+    state: status,
+    repository: payload.repository ?? null,
     revision: payload.revision ?? null,
     producer: payload.producer ?? "project-evidence-v1",
     metrics: payload.metrics.map((metric) => ({
       label: metric.label ?? metric.id ?? "Unnamed metric",
       value: formatMetricValue(metric),
-      state: metric.state ?? joinState(status, freshness),
+      state: metric.state ?? status,
     })),
     accomplishments: Array.isArray(payload.accomplishments) ? payload.accomplishments : [],
   };
@@ -185,6 +189,7 @@ function normalizeCodingTooling(payload) {
 
   return {
     state: aggregateState(sourceStates),
+    repository: payload?.repository?.fullName ?? null,
     revision: payload?.repository?.revision ?? null,
     producer: "coding-tooling",
     metrics: rows,
@@ -346,7 +351,13 @@ function aggregateState(states) {
 function stateKey(value) {
   const normalized = String(value ?? "unavailable").toLowerCase();
   if (normalized.includes("unavailable")) return "unavailable";
-  if (normalized.includes("incomplete") || normalized.includes("stale")) return "incomplete";
+  if (
+    normalized.includes("incomplete") ||
+    normalized.includes("stale") ||
+    normalized.includes("unverified") ||
+    normalized.includes("revision missing")
+  )
+    return "incomplete";
   if (normalized.includes("failed") || normalized.includes("regression")) return "failed";
   if (normalized.includes("current") || normalized.includes("passed")) return "current";
   return "unknown";

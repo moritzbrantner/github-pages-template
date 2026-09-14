@@ -8,8 +8,7 @@
   "producer": "moonlight-runtime-profile",
   "revision": "0123456789abcdef0123456789abcdef01234567",
   "generatedAt": "2026-09-14T02:00:00Z",
-  "status": "current",
-  "freshness": "current",
+  "status": "passed",
   "metrics": [
     {
       "id": "camera-world-pan-p95-frame-time",
@@ -33,9 +32,12 @@
 
 ## Rules
 
-- `revision` should be the exact source revision that produced the evidence.
+- `revision` is the exact source revision that produced the evidence and is required for evidence to be presented as current.
+- Producers own `status`, metric states, thresholds, comparability, units, and verdicts. They do not own repository freshness.
+- The Pages renderer derives freshness by comparing the evidence revision with the current repository revision supplied by the configured `coding-tooling-analysis-v1` source.
+- An exact revision match is displayed as current. A mismatch is stale. A missing evidence revision or unavailable current-revision source fails closed as incomplete.
+- A stored `freshness` field, if present in older producer output, is ignored; persisted evidence cannot know whether a later default-branch commit has superseded it.
 - Missing or malformed evidence is unavailable/incomplete, never zero or green.
-- Producers retain authority for thresholds, comparability, units, and verdicts.
 - Accomplishments should only be emitted when the producer or a repository-owned policy can mechanically justify them.
 - Different evidence families remain separate. The Pages template does not collapse them into a synthetic quality score.
 - A consumer may publish multiple sources. The renderer preserves source identity for every metric.
