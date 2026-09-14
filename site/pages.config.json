@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "GitHub Pages Template",
+    "repository": "moritzbrantner/github-pages-template",
+    "basePath": "/github-pages-template/",
+    "kicker": "Shared project evidence surface",
+    "description": "A framework-neutral Pages foundation for project stats, accomplishments, evidence provenance, and durable navigation."
+  },
+  "links": [
+    {
+      "label": "Source",
+      "href": "https://github.com/moritzbrantner/github-pages-template"
+    }
+  ],
+  "evidenceSources": [
+    {
+      "id": "coding-tooling",
+      "label": "Repository verification",
+      "kind": "coding-tooling-analysis-v1",
+      "producer": "coding-tooling",
+      "url": "https://moritzbrantner.github.io/coding-tooling/analysis.json/?repo=moritzbrantner/github-pages-template"
+    }
+  ]
+}
