@@ -26,6 +26,12 @@ Run the tests with:
 node --test
 ```
 
+## One-time GitHub Pages activation
+
+GitHub does not allow a repository `GITHUB_TOKEN` to create the Pages site itself. For a newly created repository, enable **Settings → Pages → Build and deployment → Source: GitHub Actions** once.
+
+The included deployment workflow preflights the Pages API. Before that one-time activation it reports that Pages is unavailable and skips deployment instead of treating the missing repository capability as a successful deployment. After activation, pushes to `main` deploy automatically through `reusable-workflows`.
+
 ## Adopt in an existing project site
 
 Install or pin this repository as a development dependency, add a `pages.config.json`, then augment the project's existing static build:
