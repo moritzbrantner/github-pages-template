@@ -1,13 +1,31 @@
 {
   "name": "@moritzbrantner/github-pages-template",
   "version": "0.1.0",
+  "private": false,
   "description": "Shared static GitHub Pages foundation for project overview, stats, accomplishments, and evidence.",
   "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moritzbrantner/github-pages-template.git"
+  },
+  "homepage": "https://moritzbrantner.github.io/github-pages-template/",
+  "bugs": {
+    "url": "https://github.com/moritzbrantner/github-pages-template/issues"
+  },
+  "keywords": [
+    "github-pages",
+    "static-site",
+    "evidence",
+    "project-template"
+  ],
   "files": [
     "bin",
     "src",
-    "README.md"
+    "docs",
+    "README.md",
+    "LICENSE",
+    "VERSION"
   ],
   "bin": {
     "github-pages-template": "./bin/github-pages-template.mjs"
@@ -16,9 +34,16 @@
     "./runtime": "./src/site-runtime.js",
     "./styles.css": "./src/site.css"
   },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
   "scripts": {
     "build:site": "node ./bin/github-pages-template.mjs build --config ./site/pages.config.json --out ./dist",
-    "test": "node --test"
+    "pack:check": "node ./scripts/verify-package.mjs",
+    "prepublishOnly": "npm run verify:release",
+    "test": "node --test",
+    "verify:release": "npm test && npm run build:site && npm run pack:check && node ./scripts/verify-release.mjs"
   },
   "engines": {
     "node": ">=24"
