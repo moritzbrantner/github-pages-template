@@ -60,7 +60,7 @@ jobs:
     name: Deploy Pages
     needs: pages-preflight
     if: ${{ needs.pages-preflight.outputs.enabled == 'true' }}
-    uses: moritzbrantner/reusable-workflows/.github/workflows/deploy-pages.yml@680d4f7bda61361b10865d8835bc7ef69a24061b
+    uses: moritzbrantner/reusable-workflows/.github/workflows/deploy-pages.yml@197a252fcfc3d4a631010c61ef77369f5461365c
     with:
       node_version: "24"
       bun_version: ""
