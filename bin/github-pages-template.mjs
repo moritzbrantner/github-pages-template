@@ -31,6 +31,7 @@ await mkdir(resolve(outDir, "evidence"), { recursive: true });
 
 await cp(resolve(packageRoot, "src/site.css"), resolve(outDir, "assets/site.css"));
 await cp(resolve(packageRoot, "src/site-runtime.js"), resolve(outDir, "assets/site-runtime.js"));
+await cp(resolve(packageRoot, "src/evidence-source.js"), resolve(outDir, "assets/evidence-source.js"));
 
 for (const entry of config.copy ?? []) {
   if (!entry?.from || !entry?.to) fail("Each copy entry needs from and to.");
