@@ -43,6 +43,8 @@ github-pages-template build --config ./pages.config.json --out ./dist --augment
 
 `--augment` preserves the project's existing `dist/index.html` and adds the shared assets plus `/stats/`, `/evidence/`, and `project-pages.json`.
 
+Augment builds record their owned paths in `project-pages.json`. A later augment build removes only those recorded paths before regenerating them, so removed copy entries do not leave stale files while the consumer's homepage and unrelated assets remain untouched. Configured copy destinations must stay inside the selected output directory, and an existing consumer-owned target is rejected instead of overwritten.
+
 This allows a project-specific demo or playground to remain authoritative for its own UI while sharing the evidence surface.
 
 ## Configuration
