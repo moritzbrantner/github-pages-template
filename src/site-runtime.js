@@ -1,3 +1,5 @@
+import { acceptCodingToolingAnalysisMessage } from "./evidence-source.js";
+
 const config = window.__PROJECT_PAGES_CONFIG__;
 const page = document.body.dataset.page;
 
@@ -13,11 +15,10 @@ async function loadEvidence() {
 
 async function readSource(source) {
   try {
-    const response = await fetch(source.url, { cache: "no-store" });
-    if (!response.ok) {
-      return { source, state: "unavailable", error: `HTTP ${response.status}` };
-    }
-    const payload = await response.json();
+    const payload =
+      source.kind === "coding-tooling-analysis-v1"
+        ? await readCodingToolingBrowserSource(source)
+        : await fetchJsonSource(source);
     const normalized = normalizeSource(source, payload);
     return { source, state: normalized.state, payload, normalized };
   } catch (error) {
@@ -27,6 +28,62 @@ async function readSource(source) {
       error: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+async function fetchJsonSource(source) {
+  const response = await fetch(source.url, { cache: "no-store" });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}
+
+function readCodingToolingBrowserSource(source) {
+  const url = new URL(source.url, location.href);
+  const repository = url.searchParams.get("repo");
+  if (!repository) {
+    return Promise.reject(
+      new Error("coding-tooling analysis source requires ?repo=owner/repository"),
+    );
+  }
+
+  const expectedOrigin = url.origin;
+  url.searchParams.set("postMessage", "1");
+
+  return new Promise((resolve, reject) => {
+    const iframe = document.createElement("iframe");
+    iframe.hidden = true;
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.title = "coding-tooling analysis transport";
+
+    const timeout = window.setTimeout(() => {
+      finish(new Error("Timed out waiting for coding-tooling analysis evidence."));
+    }, 30_000);
+
+    function onMessage(event) {
+      const accepted = acceptCodingToolingAnalysisMessage(event, {
+        sourceWindow: iframe.contentWindow,
+        expectedOrigin,
+        repository,
+      });
+      if (!accepted) return;
+      if (accepted.error) {
+        finish(new Error(accepted.error));
+        return;
+      }
+      finish(null, accepted.analysis);
+    }
+
+    function finish(error, payload) {
+      window.clearTimeout(timeout);
+      window.removeEventListener("message", onMessage);
+      iframe.remove();
+      if (error) reject(error);
+      else resolve(payload);
+    }
+
+    window.addEventListener("message", onMessage);
+    iframe.src = url.href;
+    document.body.append(iframe);
+  });
 }
 
 function normalizeSource(source, payload) {
@@ -80,12 +137,18 @@ function normalizeCodingTooling(payload) {
   });
   rows.push({
     label: "Public contracts verified",
-    value: ratioValue(kpis?.publicContracts?.contracts?.verified, kpis?.publicContracts?.contracts?.discovered),
+    value: ratioValue(
+      kpis?.publicContracts?.contracts?.verified,
+      kpis?.publicContracts?.contracts?.discovered,
+    ),
     state: kpiState(kpis?.publicContracts),
   });
   rows.push({
     label: "HTTP endpoints verified",
-    value: ratioValue(kpis?.publicContracts?.httpEndpoints?.verified, kpis?.publicContracts?.httpEndpoints?.discovered),
+    value: ratioValue(
+      kpis?.publicContracts?.httpEndpoints?.verified,
+      kpis?.publicContracts?.httpEndpoints?.discovered,
+    ),
     state: kpiState(kpis?.publicContracts),
   });
   rows.push({
@@ -170,7 +233,11 @@ function renderStats(results) {
     const detail = document.createElement("p");
     detail.textContent = item.detail ?? "";
     const meta = document.createElement("small");
-    meta.textContent = [item.state, item.revision ? shortRevision(item.revision) : null, item.source.label]
+    meta.textContent = [
+      item.state,
+      item.revision ? shortRevision(item.revision) : null,
+      item.source.label,
+    ]
       .filter(Boolean)
       .join(" · ");
     li.append(heading, detail, meta);
@@ -244,7 +311,8 @@ function formatMetricValue(metric) {
   if (metric.value == null) return "Unavailable";
   const value = typeof metric.value === "number" ? formatNumber(metric.value) : String(metric.value);
   const unit = metric.unit ? ` ${metric.unit}` : "";
-  const baseline = metric.baseline == null ? "" : ` · baseline ${formatNumber(metric.baseline)}${unit}`;
+  const baseline =
+    metric.baseline == null ? "" : ` · baseline ${formatNumber(metric.baseline)}${unit}`;
   return `${value}${unit}${baseline}`;
 }
 
