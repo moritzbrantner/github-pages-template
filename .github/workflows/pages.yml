@@ -16,12 +16,13 @@ permissions:
 jobs:
   deploy-pages:
     name: Deploy Pages
-    uses: moritzbrantner/reusable-workflows/.github/workflows/deploy-pages.yml@680d4f7bda61361b10865d8835bc7ef69a24061b
+    uses: moritzbrantner/reusable-workflows/.github/workflows/deploy-pages.yml@06942ee3031da5d7ec311ed1494c1b4dd80cec06
     with:
       node_version: "24"
       bun_version: ""
       install_command: ""
       build_command: "node ./bin/github-pages-template.mjs build --config ./site/pages.config.json --out ./dist"
       artifact_path: dist
+      enable_pages: true
       cache_bun: false
       cache_node: false
