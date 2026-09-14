@@ -20,10 +20,10 @@ node ./bin/github-pages-template.mjs build \
   --out ./dist
 ```
 
-Run the tests with:
+Run the release-grade validation with:
 
 ```sh
-node --test
+npm run verify:release
 ```
 
 ## One-time GitHub Pages activation
@@ -34,7 +34,15 @@ The included deployment workflow preflights the Pages API. Before that one-time 
 
 ## Adopt in an existing project site
 
-Install or pin this repository as a development dependency, add a `pages.config.json`, then augment the project's existing static build:
+Use the public npm package as the canonical dependency:
+
+```sh
+npm install --save-dev @moritzbrantner/github-pages-template
+```
+
+Commit the consumer lockfile so the build retains an exact resolved artifact and integrity hash. Renovate can then update the normal package dependency without maintaining repository-specific `git fetch` snippets.
+
+Add a `pages.config.json`, build the project's existing static site, then augment that output:
 
 ```sh
 vite build
@@ -46,6 +54,8 @@ github-pages-template build --config ./pages.config.json --out ./dist --augment
 Augment builds record their owned paths in `project-pages.json`. A later augment build removes only those recorded paths before regenerating them, so removed copy entries do not leave stale files while the consumer's homepage and unrelated assets remain untouched. Configured copy destinations must stay inside the selected output directory, and an existing consumer-owned target is rejected instead of overwritten.
 
 This allows a project-specific demo or playground to remain authoritative for its own UI while sharing the evidence surface.
+
+See [`docs/consumer-adoption.md`](docs/consumer-adoption.md) for the full consumer contract.
 
 ## Configuration
 
@@ -90,6 +100,12 @@ The renderer is fail-closed:
 - stale or incomplete evidence is not presented as current;
 - separate evidence families are not collapsed into a synthetic quality score;
 - accomplishments are displayed only when a producer publishes them explicitly.
+
+## Releases
+
+`@moritzbrantner/github-pages-template` is published publicly to npm from version-matched `v*` tags. The tag workflow verifies the package payload, is safe to rerun when an npm version already exists, and creates the corresponding GitHub Release.
+
+See [`docs/releasing.md`](docs/releasing.md) for the first-publish bootstrap and normal trusted-publishing flow.
 
 ## Ownership boundaries
 
