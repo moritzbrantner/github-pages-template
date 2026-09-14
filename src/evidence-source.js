@@ -15,5 +15,6 @@ export function acceptCodingToolingAnalysisMessage(
     return { error: String(data.error.message) };
   }
   if (!data.analysis || typeof data.analysis !== "object") return null;
+  if (data.analysis.schemaVersion !== 1) return null;
   return { analysis: data.analysis };
 }
