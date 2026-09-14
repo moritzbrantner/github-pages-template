@@ -12,7 +12,7 @@ if (config && (page === "stats" || page === "evidence")) {
 
 async function loadEvidence() {
   let sources = await Promise.all((config.evidenceSources ?? []).map(readSource));
-  sources = reconcileProjectEvidenceFreshness(sources);
+  sources = reconcileProjectEvidenceFreshness(sources, config.project.repository);
   if (page === "stats") renderStats(sources);
   if (page === "evidence") renderEvidence(sources);
 }
@@ -115,6 +115,7 @@ function normalizeProjectEvidence(payload) {
   const status = payload.status ?? "unknown";
   return {
     state: status,
+    repository: payload.repository ?? null,
     revision: payload.revision ?? null,
     producer: payload.producer ?? "project-evidence-v1",
     metrics: payload.metrics.map((metric) => ({
@@ -188,6 +189,7 @@ function normalizeCodingTooling(payload) {
 
   return {
     state: aggregateState(sourceStates),
+    repository: payload?.repository?.fullName ?? null,
     revision: payload?.repository?.revision ?? null,
     producer: "coding-tooling",
     metrics: rows,
