@@ -13,6 +13,7 @@
 
 - Keep the generator framework-neutral and dependency-light.
 - Preserve existing project home/demo pages when using augment mode.
+- In augment mode, delete only paths previously recorded as template-owned; never clean the consumer build directory broadly or overwrite an unowned copy target.
 - Prefer stable URL-addressable routes (`/stats/`, `/evidence/`) over SPA-only state.
 - Keep GitHub project-site base paths explicit and tested.
 - Favor semantic HTML, keyboard access, reduced-motion behavior, and responsive layouts.

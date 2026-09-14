@@ -1,10 +1,20 @@
 #!/usr/bin/env node
 
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { cp, lstat, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const managedBy = "@moritzbrantner/github-pages-template";
+const coreManagedPaths = [
+  "assets/site.css",
+  "assets/site-runtime.js",
+  "assets/evidence-source.js",
+  "stats/index.html",
+  "evidence/index.html",
+  "project-pages.json",
+];
+const reservedCopyPaths = new Set([...coreManagedPaths, "index.html"]);
 
 const [, , command, ...rawArgs] = process.argv;
 if (command !== "build") {
@@ -22,7 +32,17 @@ const outDir = resolve(args.out);
 const config = JSON.parse(await readFile(configPath, "utf8"));
 validateConfig(config);
 
-if (!args.augment) {
+const previous = args.augment ? await readPreviousManifest(outDir) : null;
+const copies = await prepareCopyEntries(config.copy ?? [], {
+  configDir,
+  outDir,
+  augment: args.augment,
+  previousManagedPaths: previous?.managedPaths ?? [],
+});
+
+if (args.augment) {
+  await cleanupPreviousManagedOutputs(outDir, previous?.managedPaths ?? []);
+} else {
   await rm(outDir, { recursive: true, force: true });
 }
 await mkdir(resolve(outDir, "assets"), { recursive: true });
@@ -33,11 +53,12 @@ await cp(resolve(packageRoot, "src/site.css"), resolve(outDir, "assets/site.css"
 await cp(resolve(packageRoot, "src/site-runtime.js"), resolve(outDir, "assets/site-runtime.js"));
 await cp(resolve(packageRoot, "src/evidence-source.js"), resolve(outDir, "assets/evidence-source.js"));
 
-for (const entry of config.copy ?? []) {
-  if (!entry?.from || !entry?.to) fail("Each copy entry needs from and to.");
-  const destination = resolve(outDir, entry.to);
-  await mkdir(dirname(destination), { recursive: true });
-  await cp(resolve(configDir, entry.from), destination, { recursive: true });
+const managedPaths = new Set(coreManagedPaths);
+if (!args.augment) managedPaths.add("index.html");
+for (const entry of copies) {
+  await mkdir(dirname(entry.destination), { recursive: true });
+  await cp(entry.source, entry.destination, { recursive: true });
+  managedPaths.add(entry.relativeDestination);
 }
 
 if (!args.augment) {
@@ -47,7 +68,18 @@ await writeFile(resolve(outDir, "stats/index.html"), renderPage(config, "stats")
 await writeFile(resolve(outDir, "evidence/index.html"), renderPage(config, "evidence"));
 await writeFile(
   resolve(outDir, "project-pages.json"),
-  `${JSON.stringify({ schemaVersion: 1, generatedFrom: config.project.repository, config }, null, 2)}\n`,
+  `${JSON.stringify(
+    {
+      schemaVersion: 1,
+      managedBy,
+      mode: args.augment ? "augment" : "full",
+      generatedFrom: config.project.repository,
+      managedPaths: [...managedPaths].sort(),
+      config,
+    },
+    null,
+    2,
+  )}\n`,
 );
 
 function parseArgs(values) {
@@ -79,6 +111,134 @@ function validateConfig(config) {
     if (!source?.id || !source?.label || !source?.kind || !source?.url) {
       fail("Each evidence source requires id, label, kind, and url.");
     }
+  }
+}
+
+async function readPreviousManifest(outDir) {
+  const manifestPath = resolve(outDir, "project-pages.json");
+  let manifest;
+  try {
+    manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    fail(
+      `Cannot safely augment because existing project-pages.json is unreadable: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+
+  if (!isTemplateManifest(manifest)) {
+    fail(
+      "Cannot safely augment because existing project-pages.json is not recognized as github-pages-template output.",
+    );
+  }
+
+  const recordedPaths = Array.isArray(manifest.managedPaths)
+    ? manifest.managedPaths
+    : coreManagedPaths;
+  return {
+    manifest,
+    managedPaths: recordedPaths.map((path) =>
+      resolveManagedOutputPath(outDir, path, "previous managed output").relativePath,
+    ),
+  };
+}
+
+function isTemplateManifest(manifest) {
+  if (manifest?.managedBy === managedBy) return true;
+  return (
+    manifest?.schemaVersion === 1 &&
+    typeof manifest?.generatedFrom === "string" &&
+    manifest?.config?.project?.repository === manifest.generatedFrom
+  );
+}
+
+async function prepareCopyEntries(entries, options) {
+  const prepared = [];
+  for (const entry of entries) {
+    if (!entry?.from || !entry?.to) fail("Each copy entry needs from and to.");
+    const destination = resolveManagedOutputPath(options.outDir, entry.to, "copy.to");
+    if (reservedCopyPaths.has(destination.relativePath)) {
+      fail(`copy.to '${entry.to}' conflicts with a github-pages-template owned output.`);
+    }
+
+    const source = resolve(options.configDir, entry.from);
+    try {
+      await lstat(source);
+    } catch (error) {
+      if (error?.code === "ENOENT") fail(`copy.from '${entry.from}' does not exist.`);
+      throw error;
+    }
+
+    if (options.augment && (await pathExists(destination.absolutePath))) {
+      const previouslyManaged = options.previousManagedPaths.some((managedPath) =>
+        isSameOrNestedPath(destination.relativePath, managedPath),
+      );
+      if (!previouslyManaged) {
+        fail(
+          `copy.to '${entry.to}' already exists and is not recorded as template-owned; refusing to overwrite consumer output.`,
+        );
+      }
+    }
+
+    prepared.push({
+      source,
+      destination: destination.absolutePath,
+      relativeDestination: destination.relativePath,
+    });
+  }
+  return prepared;
+}
+
+async function cleanupPreviousManagedOutputs(outDir, managedPaths) {
+  for (const path of managedPaths) {
+    if (path === "index.html") continue;
+    const managed = resolveManagedOutputPath(outDir, path, "previous managed output");
+    await rm(managed.absolutePath, { recursive: true, force: true });
+  }
+}
+
+function resolveManagedOutputPath(root, candidate, label) {
+  if (typeof candidate !== "string" || !candidate.trim()) {
+    fail(`${label} must be a non-empty relative path.`);
+  }
+  const portable = candidate.replaceAll("\\", "/");
+  if (isAbsolute(candidate) || /^[A-Za-z]:\//.test(portable)) {
+    fail(`${label} '${candidate}' must stay within the output directory.`);
+  }
+  if (portable.split("/").includes("..")) {
+    fail(`${label} '${candidate}' must stay within the output directory.`);
+  }
+
+  const absolutePath = resolve(root, candidate);
+  const relativePath = relative(root, absolutePath);
+  if (
+    !relativePath ||
+    relativePath === ".." ||
+    relativePath.startsWith(`..${sep}`) ||
+    isAbsolute(relativePath)
+  ) {
+    fail(`${label} '${candidate}' must stay within the output directory.`);
+  }
+
+  return {
+    absolutePath,
+    relativePath: relativePath.split(sep).join("/"),
+  };
+}
+
+function isSameOrNestedPath(candidate, managedPath) {
+  return candidate === managedPath || candidate.startsWith(`${managedPath}/`);
+}
+
+async function pathExists(path) {
+  try {
+    await lstat(path);
+    return true;
+  } catch (error) {
+    if (error?.code === "ENOENT") return false;
+    throw error;
   }
 }
 

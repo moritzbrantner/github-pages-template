@@ -46,7 +46,11 @@ test("build creates overview, stats, evidence, and machine-readable manifest", a
   assert.match(stats, /Current measurements/);
   assert.match(evidence, /Each source retains its producer/);
   assert.equal(manifest.schemaVersion, 1);
+  assert.equal(manifest.managedBy, "@moritzbrantner/github-pages-template");
+  assert.equal(manifest.mode, "full");
   assert.equal(manifest.generatedFrom, "example/fixture");
+  assert.ok(manifest.managedPaths.includes("index.html"));
+  assert.ok(manifest.managedPaths.includes("stats/index.html"));
 });
 
 test("augment mode preserves an existing project index", async () => {
@@ -69,4 +73,97 @@ test("augment mode preserves an existing project index", async () => {
 
   assert.equal(await readFile(join(out, "index.html"), "utf8"), "<main>project demo</main>\n");
   assert.match(await readFile(join(out, "stats/index.html"), "utf8"), /Stats/);
+});
+
+test("augment mode removes stale template-owned copies without touching consumer output", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pages-template-owned-output-"));
+  const configPath = join(root, "pages.config.json");
+  const copiedSource = join(root, "runtime.json");
+  const out = join(root, "dist");
+  const firstConfig = config();
+  firstConfig.copy = [{ from: "runtime.json", to: "evidence/runtime.json" }];
+
+  await mkdir(join(out, "assets"), { recursive: true });
+  await writeFile(configPath, `${JSON.stringify(firstConfig, null, 2)}\n`);
+  await writeFile(copiedSource, '{"revision":"first"}\n');
+  await writeFile(join(out, "index.html"), "<main>project demo</main>\n");
+  await writeFile(join(out, "assets/consumer.js"), "consumer();\n");
+
+  await execFileAsync(process.execPath, [
+    cli,
+    "build",
+    "--config",
+    configPath,
+    "--out",
+    out,
+    "--augment",
+  ]);
+  assert.equal(await readFile(join(out, "evidence/runtime.json"), "utf8"), '{"revision":"first"}\n');
+
+  await writeFile(configPath, `${JSON.stringify(config(), null, 2)}\n`);
+  await execFileAsync(process.execPath, [
+    cli,
+    "build",
+    "--config",
+    configPath,
+    "--out",
+    out,
+    "--augment",
+  ]);
+
+  await assert.rejects(readFile(join(out, "evidence/runtime.json"), "utf8"), { code: "ENOENT" });
+  assert.equal(await readFile(join(out, "index.html"), "utf8"), "<main>project demo</main>\n");
+  assert.equal(await readFile(join(out, "assets/consumer.js"), "utf8"), "consumer();\n");
+  const manifest = JSON.parse(await readFile(join(out, "project-pages.json"), "utf8"));
+  assert.equal(manifest.mode, "augment");
+  assert.ok(!manifest.managedPaths.includes("index.html"));
+  assert.ok(!manifest.managedPaths.includes("evidence/runtime.json"));
+});
+
+test("copy destinations cannot escape the output directory", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pages-template-copy-boundary-"));
+  const configPath = join(root, "pages.config.json");
+  const out = join(root, "dist");
+  const invalidConfig = config();
+  invalidConfig.copy = [{ from: "runtime.json", to: "../runtime.json" }];
+  await writeFile(configPath, `${JSON.stringify(invalidConfig, null, 2)}\n`);
+  await writeFile(join(root, "runtime.json"), "{}\n");
+
+  await assert.rejects(
+    execFileAsync(process.execPath, [cli, "build", "--config", configPath, "--out", out]),
+    (error) => {
+      assert.match(error.stderr, /must stay within the output directory/);
+      return true;
+    },
+  );
+});
+
+test("augment mode refuses to overwrite consumer-owned copy destinations", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pages-template-copy-owner-"));
+  const configPath = join(root, "pages.config.json");
+  const out = join(root, "dist");
+  const collisionConfig = config();
+  collisionConfig.copy = [{ from: "runtime.json", to: "evidence/runtime.json" }];
+
+  await mkdir(join(out, "evidence"), { recursive: true });
+  await writeFile(configPath, `${JSON.stringify(collisionConfig, null, 2)}\n`);
+  await writeFile(join(root, "runtime.json"), "generated\n");
+  await writeFile(join(out, "evidence/runtime.json"), "consumer\n");
+
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      cli,
+      "build",
+      "--config",
+      configPath,
+      "--out",
+      out,
+      "--augment",
+    ]),
+    (error) => {
+      assert.match(error.stderr, /refusing to overwrite consumer output/);
+      return true;
+    },
+  );
+  assert.equal(await readFile(join(out, "evidence/runtime.json"), "utf8"), "consumer\n");
 });
