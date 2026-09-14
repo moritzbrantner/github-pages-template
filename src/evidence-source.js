@@ -19,10 +19,12 @@ export function acceptCodingToolingAnalysisMessage(
   return { analysis: data.analysis };
 }
 
-export function reconcileProjectEvidenceFreshness(results) {
+export function reconcileProjectEvidenceFreshness(results, expectedRepository) {
   const currentRevision = results.find(
     (result) =>
       result?.source?.kind === "coding-tooling-analysis-v1" &&
+      sourceRepository(result.source) === expectedRepository &&
+      result?.normalized?.repository === expectedRepository &&
       typeof result?.normalized?.revision === "string" &&
       result.normalized.revision.length > 0,
   )?.normalized?.revision;
@@ -57,6 +59,14 @@ export function reconcileProjectEvidenceFreshness(results) {
 
     return { ...result, normalized, state: normalized.state };
   });
+}
+
+function sourceRepository(source) {
+  try {
+    return new URL(source?.url).searchParams.get("repo");
+  } catch {
+    return null;
+  }
 }
 
 function appendFreshness(state, freshness) {
