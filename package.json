@@ -1,0 +1,26 @@
+{
+  "name": "@moritzbrantner/github-pages-template",
+  "version": "0.1.0",
+  "description": "Shared static GitHub Pages foundation for project overview, stats, accomplishments, and evidence.",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "bin",
+    "src",
+    "README.md"
+  ],
+  "bin": {
+    "github-pages-template": "./bin/github-pages-template.mjs"
+  },
+  "exports": {
+    "./runtime": "./src/site-runtime.js",
+    "./styles.css": "./src/site.css"
+  },
+  "scripts": {
+    "build:site": "node ./bin/github-pages-template.mjs build --config ./site/pages.config.json --out ./dist",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
