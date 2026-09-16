@@ -16,6 +16,15 @@ export function acceptCodingToolingAnalysisMessage(
   }
   if (!data.analysis || typeof data.analysis !== "object") return null;
   if (data.analysis.schemaVersion !== 1) return null;
+  if (data.analysis.repository?.fullName !== repository) {
+    return { error: "coding-tooling analysis repository does not match requested repository" };
+  }
+  if (
+    typeof data.analysis.repository?.revision !== "string" ||
+    !data.analysis.repository.revision.trim()
+  ) {
+    return { error: "coding-tooling analysis is missing an exact repository revision" };
+  }
   return { analysis: data.analysis };
 }
 
