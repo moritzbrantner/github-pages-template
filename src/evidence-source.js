@@ -14,8 +14,12 @@ export function acceptCodingToolingAnalysisMessage(
   if (data.error?.message) {
     return { error: String(data.error.message) };
   }
-  if (!data.analysis || typeof data.analysis !== "object") return null;
-  if (data.analysis.schemaVersion !== 1) return null;
+  if (!data.analysis || typeof data.analysis !== "object") {
+    return { error: "coding-tooling analysis payload is missing or malformed" };
+  }
+  if (data.analysis.schemaVersion !== 1) {
+    return { error: "coding-tooling analysis schemaVersion must be 1" };
+  }
   if (data.analysis.repository?.fullName !== repository) {
     return { error: "coding-tooling analysis repository does not match requested repository" };
   }
@@ -74,8 +78,7 @@ export function buildEvidenceDiagnostics(results, expectedRepository) {
     const normalized = result?.normalized;
     const payload = result?.payload;
     const source = result?.source ?? {};
-    const repository =
-      normalized?.repository ?? payload?.repository ?? sourceRepository(source) ?? expectedRepository ?? null;
+    const repository = normalized?.repository ?? payload?.repository ?? sourceRepository(source) ?? null;
     const evidenceRevision = normalized?.revision ?? payload?.revision ?? null;
     const generatedAt = typeof payload?.generatedAt === "string" ? payload.generatedAt : null;
     const producer = normalized?.producer ?? payload?.producer ?? source.producer ?? source.kind ?? "unknown";
@@ -116,7 +119,11 @@ function diagnoseResult({
     const message = result?.error || "Evidence source could not be loaded.";
     const code = message.includes("repository does not match")
       ? "repository-identity-mismatch"
-      : "source-unavailable";
+      : message.includes("schema") || message.includes("malformed")
+        ? "malformed-schema"
+        : message.includes("missing an exact repository revision")
+          ? "missing-revision"
+          : "source-unavailable";
     return { code, message };
   }
 
