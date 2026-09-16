@@ -45,6 +45,29 @@ test("rejects mismatched provenance", () => {
   );
 });
 
+test("fails closed on malformed matching coding-tooling payloads", () => {
+  assert.deepEqual(
+    accept({
+      source: sourceWindow,
+      origin: expectedOrigin,
+      data: {
+        type: CODING_TOOLING_ANALYSIS_MESSAGE_TYPE,
+        repository,
+        analysis: { schemaVersion: 2, repository: { fullName: repository, revision } },
+      },
+    }),
+    { error: "coding-tooling analysis schemaVersion must be 1" },
+  );
+  assert.deepEqual(
+    accept({
+      source: sourceWindow,
+      origin: expectedOrigin,
+      data: { type: CODING_TOOLING_ANALYSIS_MESSAGE_TYPE, repository },
+    }),
+    { error: "coding-tooling analysis payload is missing or malformed" },
+  );
+});
+
 test("fails closed when embedded analysis repository identity differs", () => {
   assert.deepEqual(
     accept({
