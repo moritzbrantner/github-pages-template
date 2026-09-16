@@ -109,6 +109,34 @@ test("reports when the current repository revision cannot be verified", () => {
   assert.equal(evidence.diagnostic.code, "current-revision-unavailable");
 });
 
+test("classifies bridge schema and revision errors explicitly", () => {
+  const [schema, missingRevision] = buildEvidenceDiagnostics(
+    [
+      {
+        source: codingTooling().source,
+        state: "unavailable",
+        error: "coding-tooling analysis schemaVersion must be 1",
+      },
+      {
+        source: codingTooling().source,
+        state: "unavailable",
+        error: "coding-tooling analysis is missing an exact repository revision",
+      },
+    ],
+    repository,
+  );
+  assert.equal(schema.diagnostic.code, "malformed-schema");
+  assert.equal(missingRevision.diagnostic.code, "missing-revision");
+});
+
+test("does not invent repository identity for an unavailable project source", () => {
+  const [evidence] = buildEvidenceDiagnostics(
+    [{ source: projectEvidence().source, state: "unavailable", error: "HTTP 404" }],
+    repository,
+  );
+  assert.equal(evidence.repository, null);
+});
+
 test("preserves source retrieval errors", () => {
   const [evidence] = buildEvidenceDiagnostics(
     [
