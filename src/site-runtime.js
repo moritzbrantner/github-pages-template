@@ -1,5 +1,6 @@
 import {
   acceptCodingToolingAnalysisMessage,
+  buildEvidenceDiagnostics,
   reconcileProjectEvidenceFreshness,
 } from "./evidence-source.js";
 
@@ -106,6 +107,7 @@ function normalizeProjectEvidence(payload) {
   if (payload?.schemaVersion !== 1 || !Array.isArray(payload?.metrics)) {
     return {
       state: "incomplete",
+      repository: payload?.repository ?? null,
       revision: payload?.revision ?? null,
       producer: payload?.producer ?? "project-evidence-v1",
       metrics: [],
@@ -252,31 +254,57 @@ function renderStats(results) {
 }
 
 function renderEvidence(results) {
-  const table = document.querySelector("#evidence-table");
+  const tableBody = document.querySelector("#evidence-table");
   const status = document.querySelector("#evidence-status");
-  if (!table || !status) return;
-  table.replaceChildren(
-    ...results.map((result) => {
-      const row = document.createElement("tr");
-      const sourceCell = document.createElement("th");
-      sourceCell.scope = "row";
-      const link = document.createElement("a");
-      link.href = result.source.url;
-      link.textContent = result.source.label;
-      sourceCell.append(link);
-      row.append(
-        sourceCell,
-        cell(result.normalized?.state ?? result.state),
-        cell(result.normalized?.revision ? shortRevision(result.normalized.revision) : "Unknown"),
-        cell(result.normalized?.producer ?? result.source.producer ?? result.source.kind),
-      );
-      return row;
-    }),
+  if (!tableBody || !status) return;
+
+  const diagnostics = buildEvidenceDiagnostics(results, config.project.repository);
+  const header = tableBody.closest("table")?.querySelector("thead tr");
+  if (header) {
+    header.replaceChildren(
+      ...[
+        "Source",
+        "Repository",
+        "Producer",
+        "State",
+        "Generated",
+        "Evidence revision",
+        "Current revision",
+        "Diagnostic",
+      ].map(headerCell),
+    );
+  }
+
+  tableBody.replaceChildren(...diagnostics.map(evidenceRow));
+
+  const attention = diagnostics.filter((item) => item.diagnostic.code !== "current").length;
+  status.textContent = attention
+    ? `${attention} of ${diagnostics.length} evidence sources need attention; unavailable, malformed, mismatched, or stale evidence is not treated as green.`
+    : `${diagnostics.length} evidence source${diagnostics.length === 1 ? "" : "s"} loaded with current identity and revision.`;
+}
+
+function evidenceRow(item) {
+  const row = document.createElement("tr");
+  row.id = evidenceAnchor(item.source.id);
+
+  const sourceCell = document.createElement("th");
+  sourceCell.scope = "row";
+  const link = document.createElement("a");
+  link.href = item.source.url;
+  link.textContent = item.source.label;
+  sourceCell.append(link);
+
+  row.append(
+    sourceCell,
+    cell(item.repository ?? "Unknown"),
+    cell(item.producer),
+    stateCell(item.state),
+    timeCell(item.generatedAt),
+    revisionCell(item.evidenceRevision),
+    revisionCell(item.currentRevision),
+    diagnosticCell(item.diagnostic),
   );
-  const unavailable = results.filter((result) => !result.normalized).length;
-  status.textContent = unavailable
-    ? `${unavailable} of ${results.length} evidence sources unavailable; unavailable evidence is not treated as green.`
-    : `${results.length} evidence source${results.length === 1 ? "" : "s"} loaded.`;
+  return row;
 }
 
 function metricRow(metric) {
@@ -289,8 +317,73 @@ function metricRow(metric) {
   sourceLink.textContent = metric.source.label;
   const sourceCell = document.createElement("td");
   sourceCell.append(sourceLink);
-  row.append(labelCell, cell(metric.value), stateCell(metric.state), sourceCell);
+  row.append(labelCell, cell(metric.value), metricStateCell(metric), sourceCell);
   return row;
+}
+
+function metricStateCell(metric) {
+  const td = stateCell(metric.state);
+  if (stateKey(metric.state) === "current" || !metric.source?.id) return td;
+
+  const link = document.createElement("a");
+  link.href = `${config.project.basePath}evidence/#${evidenceAnchor(metric.source.id)}`;
+  link.textContent = td.textContent;
+  link.setAttribute("aria-label", `${td.textContent}; inspect ${metric.source.label} evidence diagnostics`);
+  td.replaceChildren(link);
+  return td;
+}
+
+function headerCell(value) {
+  const th = document.createElement("th");
+  th.scope = "col";
+  th.textContent = value;
+  return th;
+}
+
+function diagnosticCell(diagnostic) {
+  const td = document.createElement("td");
+  const strong = document.createElement("strong");
+  strong.textContent = diagnostic.code;
+  const detail = document.createElement("small");
+  detail.textContent = diagnostic.message;
+  td.append(strong, document.createElement("br"), detail);
+  return td;
+}
+
+function timeCell(value) {
+  const td = document.createElement("td");
+  if (!value) {
+    td.textContent = "Unknown";
+    return td;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    td.textContent = value;
+    return td;
+  }
+  const time = document.createElement("time");
+  time.dateTime = value;
+  time.title = value;
+  time.textContent = date.toLocaleString();
+  td.append(time);
+  return td;
+}
+
+function revisionCell(value) {
+  const td = document.createElement("td");
+  if (!value) {
+    td.textContent = "Unknown";
+    return td;
+  }
+  const code = document.createElement("code");
+  code.title = String(value);
+  code.textContent = shortRevision(value);
+  td.append(code);
+  return td;
+}
+
+function evidenceAnchor(sourceId) {
+  return `source-${String(sourceId ?? "unknown").replace(/[^A-Za-z0-9_-]/g, "-")}`;
 }
 
 function cell(value) {
@@ -355,7 +448,8 @@ function stateKey(value) {
     normalized.includes("incomplete") ||
     normalized.includes("stale") ||
     normalized.includes("unverified") ||
-    normalized.includes("revision missing")
+    normalized.includes("revision missing") ||
+    normalized.includes("repository mismatch")
   )
     return "incomplete";
   if (normalized.includes("failed") || normalized.includes("regression")) return "failed";

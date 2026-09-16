@@ -6,13 +6,13 @@ import {
   acceptCodingToolingAnalysisMessage,
 } from "../src/evidence-source.js";
 
-test("rejects unsupported coding-tooling analysis schemas", () => {
+test("fails closed on unsupported coding-tooling analysis schemas", () => {
   const sourceWindow = {};
   const expectedOrigin = "https://moritzbrantner.github.io";
   const repository = "moritzbrantner/maps";
 
   for (const schemaVersion of [undefined, 0, 2, "1"]) {
-    assert.equal(
+    assert.deepEqual(
       acceptCodingToolingAnalysisMessage(
         {
           source: sourceWindow,
@@ -25,7 +25,7 @@ test("rejects unsupported coding-tooling analysis schemas", () => {
         },
         { sourceWindow, expectedOrigin, repository },
       ),
-      null,
+      { error: "coding-tooling analysis schemaVersion must be 1" },
     );
   }
 });

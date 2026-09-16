@@ -70,3 +70,11 @@ test("does not use coding-tooling revisions from a different repository", () => 
   assert.equal(evidence.normalized.state, "incomplete · revision unverified");
   assert.equal(evidence.normalized.metrics[0].state, "passed · revision unverified");
 });
+
+test("fails closed when project evidence identifies a different repository", () => {
+  const input = results("abc", "abc");
+  input[1].normalized.repository = "moritzbrantner/other";
+  const [, evidence] = reconcileProjectEvidenceFreshness(input, repository);
+  assert.equal(evidence.normalized.state, "incomplete · repository mismatch");
+  assert.equal(evidence.normalized.metrics[0].state, "passed · repository mismatch");
+});
