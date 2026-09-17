@@ -26,6 +26,7 @@ const coreManagedPaths = [
   "assets/evidence-source.js",
   "stats/index.html",
   "evidence/index.html",
+  "preferences/index.html",
   "project-pages.json",
 ];
 const reservedCopyPaths = new Set([...coreManagedPaths, "index.html"]);
@@ -62,6 +63,7 @@ if (args.augment) {
 await mkdir(resolve(outDir, "assets"), { recursive: true });
 await mkdir(resolve(outDir, "stats"), { recursive: true });
 await mkdir(resolve(outDir, "evidence"), { recursive: true });
+await mkdir(resolve(outDir, "preferences"), { recursive: true });
 
 await cp(resolve(packageRoot, "src/site.css"), resolve(outDir, "assets/site.css"));
 await cp(resolve(packageRoot, "src/site-runtime.js"), resolve(outDir, "assets/site-runtime.js"));
@@ -82,6 +84,7 @@ if (!args.augment) {
 }
 await writeFile(resolve(outDir, "stats/index.html"), renderPage(config, "stats"));
 await writeFile(resolve(outDir, "evidence/index.html"), renderPage(config, "evidence"));
+await writeFile(resolve(outDir, "preferences/index.html"), renderPage(config, "preferences"));
 await writeFile(
   resolve(outDir, "project-pages.json"),
   `${JSON.stringify(
@@ -338,9 +341,16 @@ function renderPage(config, page) {
       ? translate(config, locale, "stats.title")
       : page === "evidence"
         ? translate(config, locale, "evidence.title")
-        : null;
+        : page === "preferences"
+          ? translate(config, locale, "preferences.summary")
+          : null;
   const title = page === "overview" ? project.name : `${pageLabel} · ${project.name}`;
-  const body = page === "overview" ? renderOverview(config, locale) : renderEvidenceSurface(config, page, locale);
+  const body =
+    page === "overview"
+      ? renderOverview(config, locale)
+      : page === "preferences"
+        ? renderPreferencesPage(config, locale)
+        : renderEvidenceSurface(config, page, locale);
   const configJson = JSON.stringify(config).replaceAll("<", "\\u003c");
   const t = (key) => escapeHtml(translate(config, locale, key));
   return `<!doctype html>
@@ -366,7 +376,7 @@ function renderPage(config, page) {
             ${navLink(translate(config, locale, "nav.evidence"), `${project.basePath}evidence/`, page === "evidence", "nav.evidence")}
             ${(config.links ?? []).map((link) => navLink(link.label, link.href, false)).join("\n            ")}
           </nav>
-          ${renderPreferenceMenu(config, locale)}
+          ${renderHeaderPreferences(config, locale, page)}
         </div>
       </div>
     </header>
@@ -391,6 +401,32 @@ function renderPreferenceBootstrap(config) {
     "\\u003c",
   );
   return `(function(settings){try{var stored=JSON.parse(localStorage.getItem(settings.key)||"{}");var values=Object.assign({},settings.defaults,stored);var scheme=values[${JSON.stringify(COLOR_SCHEME_SETTING_ID)}];if(scheme==="light"||scheme==="dark")document.documentElement.dataset.colorScheme=scheme;var contrast=values[${JSON.stringify(CONTRAST_SETTING_ID)}];if(contrast==="normal"||contrast==="high"||contrast==="low")document.documentElement.dataset.contrast=contrast;var locale=values[${JSON.stringify(LOCALE_SETTING_ID)}];if(settings.locales.includes(locale)){document.documentElement.lang=locale;document.documentElement.dir=/^(ar|fa|he|ur)(-|_|$)/i.test(locale)?"rtl":"ltr";}}catch(_error){}})(${payload});`;
+}
+
+function renderHeaderPreferences(config, locale, page) {
+  const defaults = preferenceDefaults(config);
+  const initialTheme = defaults[COLOR_SCHEME_SETTING_ID] === "dark" ? "dark" : "light";
+  const t = (key) => escapeHtml(translate(config, locale, key));
+  return `<div class="site-quick-preferences">
+            <button class="quick-control theme-toggle" type="button" data-preference-action="toggle-color-scheme" data-theme-state="${initialTheme}" aria-pressed="${initialTheme === "dark" ? "true" : "false"}">
+              <span class="quick-control__category" data-i18n="preferences.theme">${t("preferences.theme")}</span>
+              <span class="theme-toggle__state theme-toggle__light">${icon("sun")}<span data-i18n="preferences.theme.light">${t("preferences.theme.light")}</span></span>
+              <span class="theme-toggle__state theme-toggle__dark">${icon("moon")}<span data-i18n="preferences.theme.dark">${t("preferences.theme.dark")}</span></span>
+            </button>
+            <label class="quick-control quick-control--language">
+              ${icon("globe")}
+              <span class="quick-control__category" data-i18n="preferences.language">${t("preferences.language")}</span>
+              <select data-preference-id="${LOCALE_SETTING_ID}">
+                ${configuredLocales(config)
+                  .map((item) => preferenceOption(item.id, defaults[LOCALE_SETTING_ID], escapeHtml(item.label)))
+                  .join("\n                ")}
+              </select>
+            </label>
+            <a class="quick-control quick-control--link" href="${config.project.basePath}preferences/"${page === "preferences" ? ' aria-current="page"' : ""}>
+              ${icon("settings")}
+              <span data-i18n="preferences.summary">${t("preferences.summary")}</span>
+            </a>
+          </div>`;
 }
 
 function renderPreferenceMenu(config, locale) {
@@ -432,6 +468,46 @@ function renderPreferenceMenu(config, locale) {
           </details>`;
 }
 
+function renderPreferencesPage(config, locale) {
+  const defaults = preferenceDefaults(config);
+  const t = (key) => escapeHtml(translate(config, locale, key));
+  return `<section class="page-heading preferences-heading">
+        <h1 data-i18n="preferences.summary">${t("preferences.summary")}</h1>
+        <p data-i18n="preferences.description">${t("preferences.description")}</p>
+      </section>
+      <section class="content-section preferences-page" aria-labelledby="preferences-form-title">
+        <h2 id="preferences-form-title" data-i18n="preferences.summary">${t("preferences.summary")}</h2>
+        <form id="site-preferences-form" class="preferences-page__form">
+          <label class="preferences-page__field">
+            <span data-i18n="preferences.theme">${t("preferences.theme")}</span>
+            <select data-preference-id="${COLOR_SCHEME_SETTING_ID}">
+              ${preferenceOption("system", defaults[COLOR_SCHEME_SETTING_ID], t("preferences.theme.system"), "preferences.theme.system")}
+              ${preferenceOption("light", defaults[COLOR_SCHEME_SETTING_ID], t("preferences.theme.light"), "preferences.theme.light")}
+              ${preferenceOption("dark", defaults[COLOR_SCHEME_SETTING_ID], t("preferences.theme.dark"), "preferences.theme.dark")}
+            </select>
+          </label>
+          <label class="preferences-page__field">
+            <span data-i18n="preferences.contrast">${t("preferences.contrast")}</span>
+            <select data-preference-id="${CONTRAST_SETTING_ID}">
+              ${preferenceOption("system", defaults[CONTRAST_SETTING_ID], t("preferences.contrast.system"), "preferences.contrast.system")}
+              ${preferenceOption("normal", defaults[CONTRAST_SETTING_ID], t("preferences.contrast.normal"), "preferences.contrast.normal")}
+              ${preferenceOption("high", defaults[CONTRAST_SETTING_ID], t("preferences.contrast.high"), "preferences.contrast.high")}
+              ${preferenceOption("low", defaults[CONTRAST_SETTING_ID], t("preferences.contrast.low"), "preferences.contrast.low")}
+            </select>
+          </label>
+          <label class="preferences-page__field">
+            <span data-i18n="preferences.language">${t("preferences.language")}</span>
+            <select data-preference-id="${LOCALE_SETTING_ID}">
+              ${configuredLocales(config)
+                .map((item) => preferenceOption(item.id, defaults[LOCALE_SETTING_ID], escapeHtml(item.label)))
+                .join("\n              ")}
+            </select>
+          </label>
+          <button type="button" id="site-preferences-reset" data-i18n="preferences.reset">${t("preferences.reset")}</button>
+        </form>
+      </section>`;
+}
+
 function preferenceOption(value, selected, label, messageKey = null) {
   return `<option value="${escapeHtml(value)}"${value === selected ? " selected" : ""}${messageKey ? ` data-i18n="${messageKey}"` : ""}>${label}</option>`;
 }
@@ -463,6 +539,16 @@ function renderEvidenceSurface(config, page, locale) {
   }
   return `<section class="page-heading"><p class="eyebrow" data-i18n="evidence.eyebrow">${t("evidence.eyebrow")}</p><h1 data-i18n="evidence.title">${t("evidence.title")}</h1><p data-i18n="evidence.intro">${t("evidence.intro")}</p></section>
       <section class="content-section"><div id="evidence-status" class="status-line" aria-live="polite" data-i18n="evidence.loading">${t("evidence.loading")}</div><div class="table-scroll"><table><thead><tr><th scope="col" data-i18n="evidence.table.source">${t("evidence.table.source")}</th><th scope="col" data-i18n="evidence.table.repository">${t("evidence.table.repository")}</th><th scope="col" data-i18n="evidence.table.producer">${t("evidence.table.producer")}</th><th scope="col" data-i18n="evidence.table.state">${t("evidence.table.state")}</th><th scope="col" data-i18n="evidence.table.generated">${t("evidence.table.generated")}</th><th scope="col" data-i18n="evidence.table.evidenceRevision">${t("evidence.table.evidenceRevision")}</th><th scope="col" data-i18n="evidence.table.currentRevision">${t("evidence.table.currentRevision")}</th><th scope="col" data-i18n="evidence.table.diagnostic">${t("evidence.table.diagnostic")}</th></tr></thead><tbody id="evidence-table"></tbody></table></div></section>`;
+}
+
+function icon(name) {
+  const path = {
+    sun: '<circle cx="12" cy="12" r="3.5"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"></path>',
+    moon: '<path d="M20.5 14.1A8.5 8.5 0 0 1 9.9 3.5 8.5 8.5 0 1 0 20.5 14.1Z"></path>',
+    globe: '<circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3a14.5 14.5 0 0 1 0 18M12 3a14.5 14.5 0 0 0 0 18"></path>',
+    settings: '<circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.11.36.32.7.6 1 .3.28.68.4 1.1.4h.09v4h-.09c-.42 0-.8.12-1.1.4-.28.3-.49.64-.6 1Z"></path>',
+  }[name];
+  return `<svg class="quick-control__icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${path ?? ""}</svg>`;
 }
 
 function navLink(label, href, current, messageKey = null) {
