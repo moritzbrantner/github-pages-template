@@ -8,6 +8,7 @@ export const COLOR_SCHEME_VALUES = Object.freeze(["system", "light", "dark"]);
 export const CONTRAST_VALUES = Object.freeze(["system", "normal", "high", "low"]);
 
 const DEFAULT_LOCALES = Object.freeze([{ id: "en", label: "English" }]);
+const COLOR_SCHEME_MEDIA_QUERY = "(prefers-color-scheme: dark)";
 
 export function configuredLocales(config) {
   const configured = config?.preferences?.locales;
@@ -128,13 +129,14 @@ export function installSitePreferences(config, options = {}) {
   const windowObject = options.window ?? globalThis.window;
   const documentObject = options.document ?? globalThis.document;
   const storage = safeStorage(windowObject);
+  const colorSchemeMedia = windowObject?.matchMedia?.(COLOR_SCHEME_MEDIA_QUERY) ?? null;
   let overrides = readPreferenceOverrides(storage, config);
   let effective = effectivePreferences(config, overrides);
 
   function apply(reason = "initial") {
     effective = effectivePreferences(config, overrides);
     applyDocumentPreferences(documentObject, effective);
-    syncControls(documentObject, effective);
+    syncControls(documentObject, effective, colorSchemeMedia);
     options.onChange?.({ reason, effective: { ...effective }, overrides: { ...overrides } });
   }
 
@@ -149,15 +151,22 @@ export function installSitePreferences(config, options = {}) {
     apply("reset");
   }
 
-  const form = documentObject?.querySelector("#site-preferences-form");
   const onInput = (event) => {
     const target = event.target;
-    if (!(target instanceof windowObject.HTMLSelectElement)) return;
-    const id = target.dataset.preferenceId;
+    if (!target || target.tagName !== "SELECT") return;
+    const id = target.dataset?.preferenceId;
     if (!id) return;
     update(id, target.value);
   };
-  form?.addEventListener("change", onInput);
+  documentObject?.addEventListener?.("change", onInput);
+
+  const onClick = (event) => {
+    const target = event.target?.closest?.("[data-preference-action]");
+    if (target?.dataset?.preferenceAction !== "toggle-color-scheme") return;
+    const current = resolvedColorScheme(effective, colorSchemeMedia);
+    update(COLOR_SCHEME_SETTING_ID, current === "dark" ? "light" : "dark");
+  };
+  documentObject?.addEventListener?.("click", onClick);
 
   const resetButton = documentObject?.querySelector("#site-preferences-reset");
   resetButton?.addEventListener("click", reset);
@@ -169,6 +178,12 @@ export function installSitePreferences(config, options = {}) {
   };
   windowObject?.addEventListener?.("storage", onStorage);
 
+  const onSystemColorScheme = () => {
+    if (effective[COLOR_SCHEME_SETTING_ID] !== "system") return;
+    syncControls(documentObject, effective, colorSchemeMedia);
+  };
+  colorSchemeMedia?.addEventListener?.("change", onSystemColorScheme);
+
   apply();
 
   return {
@@ -177,9 +192,11 @@ export function installSitePreferences(config, options = {}) {
     },
     reset,
     dispose() {
-      form?.removeEventListener("change", onInput);
+      documentObject?.removeEventListener?.("change", onInput);
+      documentObject?.removeEventListener?.("click", onClick);
       resetButton?.removeEventListener("click", reset);
       windowObject?.removeEventListener?.("storage", onStorage);
+      colorSchemeMedia?.removeEventListener?.("change", onSystemColorScheme);
     },
   };
 }
@@ -190,10 +207,24 @@ function copyOverride(target, candidate, defaults, id, validate) {
   target[id] = value;
 }
 
-function syncControls(documentObject, effective) {
+function resolvedColorScheme(effective, colorSchemeMedia) {
+  const configured = effective?.[COLOR_SCHEME_SETTING_ID];
+  if (configured === "light" || configured === "dark") return configured;
+  return colorSchemeMedia?.matches ? "dark" : "light";
+}
+
+function syncControls(documentObject, effective, colorSchemeMedia) {
   for (const control of documentObject?.querySelectorAll?.("[data-preference-id]") ?? []) {
     const id = control.dataset.preferenceId;
     if (id && id in effective) control.value = effective[id];
+  }
+
+  const colorScheme = resolvedColorScheme(effective, colorSchemeMedia);
+  for (const toggle of documentObject?.querySelectorAll?.(
+    '[data-preference-action="toggle-color-scheme"]',
+  ) ?? []) {
+    toggle.dataset.themeState = colorScheme;
+    toggle.setAttribute?.("aria-pressed", colorScheme === "dark" ? "true" : "false");
   }
 }
 
