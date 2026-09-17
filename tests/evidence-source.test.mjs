@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   CODING_TOOLING_ANALYSIS_MESSAGE_TYPE,
   acceptCodingToolingAnalysisMessage,
+  readJsonEvidenceResponse,
 } from "../src/evidence-source.js";
 
 const sourceWindow = {};
@@ -118,5 +119,46 @@ test("preserves explicit producer errors", () => {
       },
     }),
     { error: "unavailable" },
+  );
+});
+
+test("reads valid JSON evidence even with a nonstandard content type", async () => {
+  const payload = { schemaVersion: 1, metrics: [] };
+  const response = new Response(JSON.stringify(payload), {
+    status: 200,
+    headers: { "content-type": "text/plain; charset=utf-8" },
+  });
+
+  assert.deepEqual(await readJsonEvidenceResponse(response), payload);
+});
+
+test("preserves HTTP errors before reading evidence bodies", async () => {
+  await assert.rejects(
+    readJsonEvidenceResponse(new Response("missing", { status: 404 })),
+    /HTTP 404/,
+  );
+});
+
+test("reports SPA HTML fallbacks as non-JSON evidence", async () => {
+  const response = new Response("<!doctype html><title>fallback</title>", {
+    status: 200,
+    headers: { "content-type": "text/html; charset=utf-8" },
+  });
+
+  await assert.rejects(
+    readJsonEvidenceResponse(response),
+    /Evidence source returned non-JSON content \(text\/html\)\./,
+  );
+});
+
+test("reports declared JSON that cannot be parsed as malformed", async () => {
+  const response = new Response("{not-json", {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
+
+  await assert.rejects(
+    readJsonEvidenceResponse(response),
+    /Evidence source returned malformed JSON \(application\/json\)\./,
   );
 });
