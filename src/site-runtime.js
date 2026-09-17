@@ -4,19 +4,67 @@ import {
   readJsonEvidenceResponse,
   reconcileProjectEvidenceFreshness,
 } from "./evidence-source.js";
+import { applyTranslations, translate } from "./site-localization.js";
+import { LOCALE_SETTING_ID, installSitePreferences } from "./site-preferences.js";
 
 const config = window.__PROJECT_PAGES_CONFIG__;
 const page = document.body.dataset.page;
+let preferenceController = null;
+let renderedResults = null;
+
+if (config) {
+  preferenceController = installSitePreferences(config, {
+    onChange({ effective }) {
+      applyPageLocalization(effective[LOCALE_SETTING_ID]);
+      if (renderedResults) rerenderEvidence();
+    },
+  });
+  applyPageLocalization(preferenceController.current()[LOCALE_SETTING_ID]);
+}
 
 if (config && (page === "stats" || page === "evidence")) {
   void loadEvidence();
 }
 
+function currentLocale() {
+  return preferenceController?.current()[LOCALE_SETTING_ID] ?? document.documentElement.lang ?? "en";
+}
+
+function t(key, values = {}) {
+  return translate(config, currentLocale(), key, values);
+}
+
+function applyPageLocalization(locale) {
+  applyTranslations(document, config, locale);
+  if (!config?.project) return;
+  const pageLabel =
+    page === "stats"
+      ? translate(config, locale, "stats.title")
+      : page === "evidence"
+        ? translate(config, locale, "evidence.title")
+        : null;
+  document.title = pageLabel ? `${pageLabel} · ${config.project.name}` : config.project.name;
+}
+
 async function loadEvidence() {
   let sources = await Promise.all((config.evidenceSources ?? []).map(readSource));
-  sources = reconcileProjectEvidenceFreshness(sources, config.project.repository);
-  if (page === "stats") renderStats(sources);
-  if (page === "evidence") renderEvidence(sources);
+  renderedResults = reconcileProjectEvidenceFreshness(sources, config.project.repository);
+  renderCurrentEvidence();
+}
+
+function rerenderEvidence() {
+  renderedResults = renderedResults.map((result) => {
+    if (!result.payload) return result;
+    const normalized = normalizeSource(result.source, result.payload);
+    return { ...result, state: normalized.state, normalized };
+  });
+  renderedResults = reconcileProjectEvidenceFreshness(renderedResults, config.project.repository);
+  renderCurrentEvidence();
+}
+
+function renderCurrentEvidence() {
+  if (page === "stats") renderStats(renderedResults);
+  if (page === "evidence") renderEvidence(renderedResults);
 }
 
 async function readSource(source) {
@@ -121,7 +169,7 @@ function normalizeProjectEvidence(payload) {
     revision: payload.revision ?? null,
     producer: payload.producer ?? "project-evidence-v1",
     metrics: payload.metrics.map((metric) => ({
-      label: metric.label ?? metric.id ?? "Unnamed metric",
+      label: metric.label ?? metric.id ?? t("common.unnamedMetric"),
       value: formatMetricValue(metric),
       state: metric.state ?? status,
     })),
@@ -134,15 +182,19 @@ function normalizeCodingTooling(payload) {
   const rows = [];
   const checklist = kpis?.work?.checklist;
   rows.push({
-    label: "Checklist work",
+    label: t("coding.checklist"),
     value:
       checklist?.remaining == null || checklist?.total == null
-        ? "Unavailable"
-        : `${checklist.remaining} remaining · ${checklist.completed}/${checklist.total} complete`,
+        ? t("common.unavailable")
+        : t("coding.checklistValue", {
+            remaining: formatNumber(checklist.remaining),
+            completed: formatNumber(checklist.completed),
+            total: formatNumber(checklist.total),
+          }),
     state: kpiState(checklist),
   });
   rows.push({
-    label: "Public contracts verified",
+    label: t("coding.publicContracts"),
     value: ratioValue(
       kpis?.publicContracts?.contracts?.verified,
       kpis?.publicContracts?.contracts?.discovered,
@@ -150,7 +202,7 @@ function normalizeCodingTooling(payload) {
     state: kpiState(kpis?.publicContracts),
   });
   rows.push({
-    label: "HTTP endpoints verified",
+    label: t("coding.httpEndpoints"),
     value: ratioValue(
       kpis?.publicContracts?.httpEndpoints?.verified,
       kpis?.publicContracts?.httpEndpoints?.discovered,
@@ -158,26 +210,29 @@ function normalizeCodingTooling(payload) {
     state: kpiState(kpis?.publicContracts),
   });
   rows.push({
-    label: "Functions covered by tests",
+    label: t("coding.functionsCovered"),
     value: coverageValue(kpis?.testCoverage?.functions),
     state: kpiState(kpis?.testCoverage),
   });
   rows.push({
-    label: "Lines covered by tests",
+    label: t("coding.linesCovered"),
     value: coverageValue(kpis?.testCoverage?.lines),
     state: kpiState(kpis?.testCoverage),
   });
   rows.push({
-    label: "Verification checks passed",
+    label: t("coding.verificationPassed"),
     value: ratioValue(kpis?.verification?.checks?.passed, kpis?.verification?.checks?.planned),
     state: kpiState(kpis?.verification),
   });
   rows.push({
-    label: "Actionable findings",
+    label: t("coding.actionableFindings"),
     value:
       kpis?.findings?.total == null
-        ? "Unavailable"
-        : `${kpis.findings.total} total · ${kpis.findings.highPriority ?? 0} high priority`,
+        ? t("common.unavailable")
+        : t("coding.findingsValue", {
+            total: formatNumber(kpis.findings.total),
+            highPriority: formatNumber(kpis.findings.highPriority ?? 0),
+          }),
     state: kpiState(kpis?.findings),
   });
 
@@ -210,7 +265,7 @@ function renderStats(results) {
       return [
         {
           label: result.source.label,
-          value: "Unavailable",
+          value: t("common.unavailable"),
           state: result.state,
           source: result.source,
         },
@@ -220,15 +275,20 @@ function renderStats(results) {
   });
 
   table.replaceChildren(...rows.map(metricRow));
-  status.textContent = `${rows.length} measurements from ${results.length} configured evidence source${results.length === 1 ? "" : "s"}.`;
+  delete status.dataset.i18n;
+  status.textContent = t(
+    results.length === 1 ? "stats.status.oneSource" : "stats.status.manySources",
+    {
+      measurements: formatNumber(rows.length),
+      sources: formatNumber(results.length),
+    },
+  );
 
   const published = results.flatMap((result) =>
     (result.normalized?.accomplishments ?? []).map((item) => ({ ...item, source: result.source })),
   );
   if (!published.length) {
-    accomplishments.replaceChildren(
-      paragraph("No published accomplishment evidence is available for this revision."),
-    );
+    accomplishments.replaceChildren(paragraph(t("stats.noAccomplishments")));
     return;
   }
   const list = document.createElement("ol");
@@ -236,7 +296,7 @@ function renderStats(results) {
   for (const item of published) {
     const li = document.createElement("li");
     const heading = document.createElement("strong");
-    heading.textContent = item.title ?? "Recorded accomplishment";
+    heading.textContent = item.title ?? t("stats.recordedAccomplishment");
     const detail = document.createElement("p");
     detail.textContent = item.detail ?? "";
     const meta = document.createElement("small");
@@ -259,28 +319,19 @@ function renderEvidence(results) {
   if (!tableBody || !status) return;
 
   const diagnostics = buildEvidenceDiagnostics(results, config.project.repository);
-  const header = tableBody.closest("table")?.querySelector("thead tr");
-  if (header) {
-    header.replaceChildren(
-      ...[
-        "Source",
-        "Repository",
-        "Producer",
-        "State",
-        "Generated",
-        "Evidence revision",
-        "Current revision",
-        "Diagnostic",
-      ].map(headerCell),
-    );
-  }
-
   tableBody.replaceChildren(...diagnostics.map(evidenceRow));
 
   const attention = diagnostics.filter((item) => item.diagnostic.code !== "current").length;
+  delete status.dataset.i18n;
   status.textContent = attention
-    ? `${attention} of ${diagnostics.length} evidence sources need attention; unavailable, malformed, mismatched, or stale evidence is not treated as green.`
-    : `${diagnostics.length} evidence source${diagnostics.length === 1 ? "" : "s"} loaded with current identity and revision.`;
+    ? t("evidence.status.attention", {
+        attention: formatNumber(attention),
+        total: formatNumber(diagnostics.length),
+      })
+    : t(
+        diagnostics.length === 1 ? "evidence.status.currentOne" : "evidence.status.currentMany",
+        { total: formatNumber(diagnostics.length) },
+      );
 }
 
 function evidenceRow(item) {
@@ -296,7 +347,7 @@ function evidenceRow(item) {
 
   row.append(
     sourceCell,
-    cell(item.repository ?? "Unknown"),
+    cell(item.repository ?? t("common.unknown")),
     cell(item.producer),
     stateCell(item.state),
     timeCell(item.generatedAt),
@@ -328,16 +379,12 @@ function metricStateCell(metric) {
   const link = document.createElement("a");
   link.href = `${config.project.basePath}evidence/#${evidenceAnchor(metric.source.id)}`;
   link.textContent = td.textContent;
-  link.setAttribute("aria-label", `${td.textContent}; inspect ${metric.source.label} evidence diagnostics`);
+  link.setAttribute(
+    "aria-label",
+    t("evidence.inspectDiagnostics", { state: td.textContent, source: metric.source.label }),
+  );
   td.replaceChildren(link);
   return td;
-}
-
-function headerCell(value) {
-  const th = document.createElement("th");
-  th.scope = "col";
-  th.textContent = value;
-  return th;
 }
 
 function diagnosticCell(diagnostic) {
@@ -353,7 +400,7 @@ function diagnosticCell(diagnostic) {
 function timeCell(value) {
   const td = document.createElement("td");
   if (!value) {
-    td.textContent = "Unknown";
+    td.textContent = t("common.unknown");
     return td;
   }
   const date = new Date(value);
@@ -364,7 +411,7 @@ function timeCell(value) {
   const time = document.createElement("time");
   time.dateTime = value;
   time.title = value;
-  time.textContent = date.toLocaleString();
+  time.textContent = date.toLocaleString(currentLocale());
   td.append(time);
   return td;
 }
@@ -372,7 +419,7 @@ function timeCell(value) {
 function revisionCell(value) {
   const td = document.createElement("td");
   if (!value) {
-    td.textContent = "Unknown";
+    td.textContent = t("common.unknown");
     return td;
   }
   const code = document.createElement("code");
@@ -388,7 +435,7 @@ function evidenceAnchor(sourceId) {
 
 function cell(value) {
   const td = document.createElement("td");
-  td.textContent = value ?? "Unavailable";
+  td.textContent = value ?? t("common.unavailable");
   return td;
 }
 
@@ -406,23 +453,25 @@ function paragraph(text) {
 }
 
 function formatMetricValue(metric) {
-  if (metric.value == null) return "Unavailable";
+  if (metric.value == null) return t("common.unavailable");
   const value = typeof metric.value === "number" ? formatNumber(metric.value) : String(metric.value);
   const unit = metric.unit ? ` ${metric.unit}` : "";
   const baseline =
-    metric.baseline == null ? "" : ` · baseline ${formatNumber(metric.baseline)}${unit}`;
+    metric.baseline == null
+      ? ""
+      : ` · ${t("common.baseline", { value: `${formatNumber(metric.baseline)}${unit}` })}`;
   return `${value}${unit}${baseline}`;
 }
 
 function coverageValue(metric) {
-  if (!metric || metric.covered == null || metric.total == null) return "Unavailable";
-  return `${metric.covered}/${metric.total} · ${formatPercent(metric.percent)}`;
+  if (!metric || metric.covered == null || metric.total == null) return t("common.unavailable");
+  return `${formatNumber(metric.covered)}/${formatNumber(metric.total)} · ${formatPercent(metric.percent)}`;
 }
 
 function ratioValue(numerator, denominator) {
-  if (numerator == null || denominator == null) return "Unavailable";
-  if (denominator === 0) return "0 discovered";
-  return `${numerator}/${denominator} · ${formatPercent((numerator / denominator) * 100)}`;
+  if (numerator == null || denominator == null) return t("common.unavailable");
+  if (denominator === 0) return t("coding.discoveredZero");
+  return `${formatNumber(numerator)}/${formatNumber(denominator)} · ${formatPercent((numerator / denominator) * 100)}`;
 }
 
 function kpiState(kpi) {
@@ -459,11 +508,16 @@ function stateKey(value) {
 
 function formatPercent(value) {
   if (!Number.isFinite(Number(value))) return "n/a";
-  return `${Number(value).toFixed(2).replace(/\.00$/, "")}%`;
+  return new Intl.NumberFormat(currentLocale(), {
+    style: "percent",
+    maximumFractionDigits: 2,
+  }).format(Number(value) / 100);
 }
 
 function formatNumber(value) {
-  return Number.isFinite(Number(value)) ? Number(value).toLocaleString() : String(value);
+  return Number.isFinite(Number(value))
+    ? new Intl.NumberFormat(currentLocale()).format(Number(value))
+    : String(value);
 }
 
 function shortRevision(value) {

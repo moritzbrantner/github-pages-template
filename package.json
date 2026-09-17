@@ -32,6 +32,8 @@
   },
   "exports": {
     "./runtime": "./src/site-runtime.js",
+    "./preferences": "./src/site-preferences.js",
+    "./localization": "./src/site-localization.js",
     "./styles.css": "./src/site.css"
   },
   "publishConfig": {

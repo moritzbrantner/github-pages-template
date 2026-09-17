@@ -10,6 +10,43 @@
   --accent: LinkText;
 }
 
+:root[data-color-scheme="light"] {
+  color-scheme: light;
+}
+
+:root[data-color-scheme="dark"] {
+  color-scheme: dark;
+}
+
+@media (prefers-contrast: more) {
+  :root:not([data-contrast]) {
+    --border: color-mix(in srgb, currentColor 48%, transparent);
+    --muted: color-mix(in srgb, currentColor 90%, transparent);
+  }
+}
+
+@media (prefers-contrast: less) {
+  :root:not([data-contrast]) {
+    --border: color-mix(in srgb, currentColor 12%, transparent);
+    --muted: color-mix(in srgb, currentColor 62%, transparent);
+  }
+}
+
+:root[data-contrast="normal"] {
+  --border: color-mix(in srgb, currentColor 18%, transparent);
+  --muted: color-mix(in srgb, currentColor 68%, transparent);
+}
+
+:root[data-contrast="high"] {
+  --border: color-mix(in srgb, currentColor 52%, transparent);
+  --muted: color-mix(in srgb, currentColor 92%, transparent);
+}
+
+:root[data-contrast="low"] {
+  --border: color-mix(in srgb, currentColor 12%, transparent);
+  --muted: color-mix(in srgb, currentColor 62%, transparent);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -26,14 +63,45 @@ a {
 }
 
 a:focus-visible,
-button:focus-visible {
+button:focus-visible,
+select:focus-visible,
+summary:focus-visible {
   outline: 3px solid Highlight;
   outline-offset: 3px;
 }
 
+button,
+select,
+summary {
+  font: inherit;
+}
+
+button,
+select {
+  min-height: 2.75rem;
+}
+
+button {
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  padding: 0.55rem 0.75rem;
+  background: var(--surface);
+  color: CanvasText;
+  cursor: pointer;
+}
+
+select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  padding: 0.5rem 2.25rem 0.5rem 0.65rem;
+  background: Canvas;
+  color: CanvasText;
+}
+
 .skip-link {
   position: absolute;
-  left: 1rem;
+  inset-inline-start: 1rem;
   top: -5rem;
   z-index: 20;
   padding: 0.65rem 0.9rem;
@@ -75,21 +143,85 @@ button:focus-visible {
   text-decoration: none;
 }
 
-nav {
+.site-header__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.site-nav {
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
 }
 
-nav a {
+.site-nav a {
   color: var(--muted);
   text-decoration: none;
 }
 
-nav a[aria-current="page"] {
+.site-nav a[aria-current="page"] {
   color: CanvasText;
   text-decoration: underline;
   text-decoration-thickness: 2px;
+}
+
+:root[data-contrast="high"] .site-nav a {
+  text-decoration: underline;
+}
+
+.site-preferences {
+  position: relative;
+  flex: none;
+}
+
+.site-preferences > summary {
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--muted);
+  list-style-position: inside;
+}
+
+.site-preferences[open] > summary {
+  color: CanvasText;
+}
+
+.site-preferences__panel {
+  position: absolute;
+  inset-inline-end: 0;
+  top: calc(100% + 0.65rem);
+  width: min(22rem, calc(100vw - 2rem));
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: Canvas;
+  box-shadow: 0 0.75rem 2rem color-mix(in srgb, CanvasText 14%, transparent);
+}
+
+.site-preferences__description {
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.site-preferences__form {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.site-preferences__form label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.site-preferences__form button {
+  justify-self: start;
 }
 
 .site-main {
@@ -169,7 +301,7 @@ th,
 td {
   padding: 0.85rem 0.75rem;
   border-bottom: 1px solid var(--border);
-  text-align: left;
+  text-align: start;
   vertical-align: top;
 }
 
@@ -194,7 +326,7 @@ td[data-state="failed"] {
 }
 
 .accomplishment-list {
-  padding-left: 1.4rem;
+  padding-inline-start: 1.4rem;
 }
 
 .accomplishment-list li {
@@ -222,8 +354,9 @@ td[data-state="failed"] {
   }
 
   .site-header__inner,
+  .site-header__actions,
   .site-footer {
-    align-items: flex-start;
+    align-items: stretch;
     flex-direction: column;
   }
 
@@ -231,8 +364,19 @@ td[data-state="failed"] {
     padding-block: 1rem;
   }
 
-  nav {
+  .site-header__actions {
+    width: 100%;
+  }
+
+  .site-nav {
     gap: 0.65rem 1rem;
+  }
+
+  .site-preferences__panel {
+    position: static;
+    width: 100%;
+    margin-top: 0.5rem;
+    box-shadow: none;
   }
 
   th,
@@ -246,5 +390,8 @@ td[data-state="failed"] {
   *::before,
   *::after {
     scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

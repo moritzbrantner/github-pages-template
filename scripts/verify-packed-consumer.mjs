@@ -134,15 +134,27 @@ async function verifyConsumer({ root, tarball, mode, repository }) {
   assert.equal(manifest.generatedFrom, repository);
   assert.equal(manifest.mode, mode);
   assert.ok(manifest.managedPaths.includes("assets/site-runtime.js"));
+  assert.ok(manifest.managedPaths.includes("assets/site-preferences.js"));
+  assert.ok(manifest.managedPaths.includes("assets/site-localization.js"));
   assert.ok(manifest.managedPaths.includes("assets/evidence-source.js"));
   assert.equal(manifest.managedPaths.includes("index.html"), mode === "full");
 
   const runtime = await readFile(join(root, "dist", "assets", "site-runtime.js"), "utf8");
+  const preferences = await readFile(
+    join(root, "dist", "assets", "site-preferences.js"),
+    "utf8",
+  );
+  const localization = await readFile(
+    join(root, "dist", "assets", "site-localization.js"),
+    "utf8",
+  );
   const evidenceSource = await readFile(
     join(root, "dist", "assets", "evidence-source.js"),
     "utf8",
   );
-  assert.match(runtime, /Evidence revision/);
+  assert.match(runtime, /installSitePreferences/);
+  assert.match(preferences, /appearance\.color_scheme/);
+  assert.match(localization, /Evidence revision/);
   assert.match(evidenceSource, /repository-identity-mismatch/);
   assert.match(evidenceSource, /Evidence source returned non-JSON content/);
 

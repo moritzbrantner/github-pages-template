@@ -16,10 +16,41 @@ A direct Git revision is acceptable only as a short-lived integration path for a
 
 ## Build integration
 
-1. Add a repository-owned `pages.config.json` describing identity, base path, links, and evidence source URLs.
+1. Add a repository-owned `pages.config.json` describing identity, base path, links, preference defaults/locales when needed, and evidence source URLs.
 2. Build the existing project site normally.
 3. Run `github-pages-template build --config ./pages.config.json --out ./dist --augment` from the installed package.
 4. Publish `dist/` with `reusable-workflows`.
+
+## Shared site preferences
+
+Consumers may configure the common Pages preference surface without taking ownership away from their domain UI:
+
+```json
+{
+  "preferences": {
+    "defaults": {
+      "appearance.color_scheme": "system",
+      "appearance.contrast": "system",
+      "localization.locale": "en"
+    },
+    "locales": [
+      { "id": "en", "label": "English" },
+      { "id": "de", "label": "Deutsch" }
+    ]
+  }
+}
+```
+
+`appearance.color_scheme` and `appearance.contrast` intentionally match the canonical IDs from the `settings` foundation. The consuming repository owns its defaults. Browser storage contains only overrides, not copied defaults, and the Pages shell owns only browser/CSS application.
+
+The built-in shell copy currently covers English and German. Additional locales can be configured by supplying message values under `preferences.messages.<locale>`. Missing messages fall back to the English shell copy rather than producing empty controls.
+
+The helpers are also public package subpaths:
+
+- `@moritzbrantner/github-pages-template/preferences`
+- `@moritzbrantner/github-pages-template/localization`
+
+A consuming application may use those helpers when it wants its own Pages-owned UI to share the same preference storage and locale conventions. Project/domain settings should continue to use their authoritative repository or the shared `settings` foundation instead of being moved into this template.
 
 ## Augment output ownership
 

@@ -5,6 +5,9 @@
 - This repository owns shared GitHub Pages presentation and static generation only.
 - Do not duplicate benchmark thresholds, comparability rules, or verdict logic from Moonlight, runtime-profiler, Unlighthouse/Lighthouse, coding-tooling, or consuming repositories.
 - Do not replace `reusable-workflows` deployment/artifact authority with repository-local deployment logic.
+- `settings` owns reusable preference choices and generic setting semantics. This repository may own Pages-specific browser detection, CSS application, presentation, and persistence adapters while reusing canonical setting IDs and values.
+- Persist user preference overrides rather than copied consumer defaults. Consuming repositories remain authoritative for their defaults.
+- Do not add color-vision, night-mode, motion, or similar controls unless they have concrete Pages behavior and preserve the owning foundation's semantics.
 - Treat missing, malformed, stale, or incomparable evidence as unavailable/incomplete; never infer success.
 - Keep evidence families separate rather than inventing a synthetic quality score.
 - Accomplishments must be mechanically justified by an evidence producer or explicit repository-owned policy.
@@ -17,6 +20,7 @@
 - Prefer stable URL-addressable routes (`/stats/`, `/evidence/`) over SPA-only state.
 - Keep GitHub project-site base paths explicit and tested.
 - Favor semantic HTML, keyboard access, reduced-motion behavior, and responsive layouts.
+- Keep appearance preferences separate from application-state URLs; locale may become URL-addressable only through an explicit localization contract.
 
 ## Distribution
 

@@ -8,7 +8,9 @@ The repository provides a zero-dependency static generator that creates standard
 - mechanically justified accomplishments;
 - evidence provenance, freshness, and exact revision;
 - stable `/stats/` and `/evidence/` routes;
-- a common accessible/responsive visual shell.
+- a common accessible/responsive visual shell;
+- shared light/dark/system theme and contrast preferences;
+- locale selection with locale-aware dates, numbers, percentages, and template-owned copy.
 
 It deliberately does **not** own benchmark semantics, thresholds, or deployment mechanics. `reusable-workflows` owns Pages deployment and artifact transport. `coding-tooling`, Moonlight, runtime-profiler, Unlighthouse, coverage tools, and repository-specific verifiers remain authoritative for the evidence they produce.
 
@@ -68,6 +70,17 @@ See [`docs/consumer-adoption.md`](docs/consumer-adoption.md) for the full consum
     "basePath": "/maps/",
     "description": "Map building blocks and first-party map engine foundations."
   },
+  "preferences": {
+    "defaults": {
+      "appearance.color_scheme": "system",
+      "appearance.contrast": "system",
+      "localization.locale": "en"
+    },
+    "locales": [
+      { "id": "en", "label": "English" },
+      { "id": "de", "label": "Deutsch" }
+    ]
+  },
   "links": [
     { "label": "Demo", "href": "/maps/" }
   ],
@@ -89,6 +102,18 @@ See [`docs/consumer-adoption.md`](docs/consumer-adoption.md) for the full consum
 ```
 
 See [`docs/project-evidence-v1.md`](docs/project-evidence-v1.md) for the producer-neutral evidence contract.
+
+## Preferences, localization, and accessibility
+
+The Pages preference layer is intentionally thin. It uses the canonical `settings` appearance IDs `appearance.color_scheme` and `appearance.contrast`, keeps consumer-selected defaults authoritative, and persists only user overrides. CSS and browser/system preference application remain owned by this presentation consumer, matching the boundary of the `settings` foundation.
+
+Color-scheme choices are `system`, `light`, and `dark`. Contrast choices are `system`, `normal`, `high`, and `low`. System choices remain live because CSS uses the browser's media preferences rather than copying an operating-system value into storage.
+
+The reference site ships English and German template copy. Consumers can configure the available locale list and can provide additional or replacement messages under `preferences.messages.<locale>`. Locale changes also update document language/direction and `Intl` formatting for dates, numbers, and percentages. Right-to-left direction is applied for Arabic, Persian, Hebrew, and Urdu locale families.
+
+The preference storage key is shared on an origin, so repositories hosted below the same GitHub Pages origin can naturally reuse a user's choices. The reusable helpers are exported as `@moritzbrantner/github-pages-template/preferences` and `@moritzbrantner/github-pages-template/localization`.
+
+Keyboard focus, a skip link, semantic landmarks, responsive controls, and `prefers-reduced-motion` remain baseline behavior regardless of the selected appearance.
 
 ## Evidence behavior
 
@@ -112,6 +137,8 @@ See [`docs/releasing.md`](docs/releasing.md) for the first-publish bootstrap and
 | Concern | Authority |
 | --- | --- |
 | Site shell, navigation, stats/evidence presentation | `github-pages-template` |
+| Appearance preference choices and generic setting semantics | `settings` |
+| Browser/CSS application of Pages appearance preferences | `github-pages-template` |
 | Deployment and artifact transport | `reusable-workflows` |
 | Repository analysis/KPI semantics | `coding-tooling` |
 | Runtime capture | `runtime-profiler` |
