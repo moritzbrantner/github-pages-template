@@ -42,7 +42,9 @@ function applyPageLocalization(locale) {
       ? translate(config, locale, "stats.title")
       : page === "evidence"
         ? translate(config, locale, "evidence.title")
-        : null;
+        : page === "preferences"
+          ? translate(config, locale, "preferences.summary")
+          : null;
   document.title = pageLabel ? `${pageLabel} · ${config.project.name}` : config.project.name;
 }
 
