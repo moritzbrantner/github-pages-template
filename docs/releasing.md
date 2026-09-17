@@ -6,7 +6,8 @@ The public npm package is the canonical distribution surface for consuming repos
 
 - `package.json` and `VERSION` contain the same version.
 - Release tags are exactly `v<package-version>`.
-- CI runs the generator tests, builds the reference site, and verifies the exact `npm pack` payload before a release can publish.
+- CI runs the generator tests, builds the reference site, verifies the exact `npm pack` payload, then installs that tarball into isolated full-site and augment consumers and executes the packaged CLI before a release can publish.
+- Packed-consumer verification must prove the installed package ships the current diagnostics runtime and that augment mode preserves consumer-owned home/application files.
 - `publishConfig` targets the public npm registry.
 - A tag workflow never republishes an existing npm version. Rerunning a partially completed release therefore converges instead of failing on an already-published package.
 - A successful tag workflow also creates the matching GitHub Release if it does not already exist.
