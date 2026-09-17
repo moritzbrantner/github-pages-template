@@ -32,6 +32,28 @@ export function acceptCodingToolingAnalysisMessage(
   return { analysis: data.analysis };
 }
 
+export async function readJsonEvidenceResponse(response) {
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+  const mediaType =
+    (response.headers.get("content-type") ?? "unknown content type")
+      .split(";", 1)[0]
+      .trim()
+      .toLowerCase() || "unknown content type";
+  const body = await response.text();
+
+  try {
+    return JSON.parse(body);
+  } catch {
+    const declaresJson = mediaType === "application/json" || mediaType.endsWith("+json");
+    throw new Error(
+      declaresJson
+        ? `Evidence source returned malformed JSON (${mediaType}).`
+        : `Evidence source returned non-JSON content (${mediaType}).`,
+    );
+  }
+}
+
 export function reconcileProjectEvidenceFreshness(results, expectedRepository) {
   const currentRevision = findCurrentRepositoryRevision(results, expectedRepository);
 
