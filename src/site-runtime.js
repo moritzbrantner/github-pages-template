@@ -1,6 +1,7 @@
 import {
   acceptCodingToolingAnalysisMessage,
   buildEvidenceDiagnostics,
+  readJsonEvidenceResponse,
   reconcileProjectEvidenceFreshness,
 } from "./evidence-source.js";
 
@@ -37,8 +38,7 @@ async function readSource(source) {
 
 async function fetchJsonSource(source) {
   const response = await fetch(source.url, { cache: "no-store" });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.json();
+  return readJsonEvidenceResponse(response);
 }
 
 function readCodingToolingBrowserSource(source) {
