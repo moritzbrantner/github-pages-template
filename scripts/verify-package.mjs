@@ -10,6 +10,8 @@ assert.equal(packageJson.repository?.url, "git+https://github.com/moritzbrantner
 assert.equal(packageJson.publishConfig?.registry, "https://registry.npmjs.org");
 assert.equal(packageJson.publishConfig?.access, "public");
 assert.equal(packageJson.bin?.["github-pages-template"], "./bin/github-pages-template.mjs");
+assert.equal(packageJson.exports?.["./preferences"], "./src/site-preferences.js");
+assert.equal(packageJson.exports?.["./localization"], "./src/site-localization.js");
 
 const output = execFileSync(
   "npm",
@@ -32,6 +34,8 @@ for (const path of [
   "VERSION",
   "bin/github-pages-template.mjs",
   "src/site-runtime.js",
+  "src/site-preferences.js",
+  "src/site-localization.js",
   "src/evidence-source.js",
   "src/site.css",
   "docs/consumer-adoption.md",
