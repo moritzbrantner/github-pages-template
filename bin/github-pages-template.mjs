@@ -3,12 +3,26 @@
 import { cp, lstat, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { translate } from "../src/site-localization.js";
+import {
+  COLOR_SCHEME_SETTING_ID,
+  COLOR_SCHEME_VALUES,
+  CONTRAST_SETTING_ID,
+  CONTRAST_VALUES,
+  LOCALE_SETTING_ID,
+  PREFERENCE_STORAGE_KEY,
+  configuredLocales,
+  isRtlLocale,
+  preferenceDefaults,
+} from "../src/site-preferences.js";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const managedBy = "@moritzbrantner/github-pages-template";
 const coreManagedPaths = [
   "assets/site.css",
   "assets/site-runtime.js",
+  "assets/site-preferences.js",
+  "assets/site-localization.js",
   "assets/evidence-source.js",
   "stats/index.html",
   "evidence/index.html",
@@ -51,6 +65,8 @@ await mkdir(resolve(outDir, "evidence"), { recursive: true });
 
 await cp(resolve(packageRoot, "src/site.css"), resolve(outDir, "assets/site.css"));
 await cp(resolve(packageRoot, "src/site-runtime.js"), resolve(outDir, "assets/site-runtime.js"));
+await cp(resolve(packageRoot, "src/site-preferences.js"), resolve(outDir, "assets/site-preferences.js"));
+await cp(resolve(packageRoot, "src/site-localization.js"), resolve(outDir, "assets/site-localization.js"));
 await cp(resolve(packageRoot, "src/evidence-source.js"), resolve(outDir, "assets/evidence-source.js"));
 
 const managedPaths = new Set(coreManagedPaths);
@@ -110,6 +126,77 @@ function validateConfig(config) {
   for (const source of config.evidenceSources ?? []) {
     if (!source?.id || !source?.label || !source?.kind || !source?.url) {
       fail("Each evidence source requires id, label, kind, and url.");
+    }
+  }
+  validatePreferences(config);
+}
+
+function validatePreferences(config) {
+  const preferences = config.preferences;
+  if (preferences == null) return;
+  if (typeof preferences !== "object" || Array.isArray(preferences)) {
+    fail("preferences must be an object.");
+  }
+
+  if (preferences.locales != null) {
+    if (!Array.isArray(preferences.locales) || preferences.locales.length === 0) {
+      fail("preferences.locales must be a non-empty array when configured.");
+    }
+    const ids = new Set();
+    for (const locale of preferences.locales) {
+      if (!locale?.id || !locale?.label) {
+        fail("Each preferences locale requires id and label.");
+      }
+      try {
+        Intl.getCanonicalLocales(locale.id);
+      } catch {
+        fail(`preferences locale '${locale.id}' is not a valid locale identifier.`);
+      }
+      if (ids.has(locale.id)) fail(`preferences locale '${locale.id}' is duplicated.`);
+      ids.add(locale.id);
+    }
+  }
+
+  if (preferences.defaults != null &&
+      (typeof preferences.defaults !== "object" || Array.isArray(preferences.defaults))) {
+    fail("preferences.defaults must be an object.");
+  }
+
+  const defaults = preferences.defaults ?? {};
+  if (
+    COLOR_SCHEME_SETTING_ID in defaults &&
+    !COLOR_SCHEME_VALUES.includes(defaults[COLOR_SCHEME_SETTING_ID])
+  ) {
+    fail(`preferences.defaults.${COLOR_SCHEME_SETTING_ID} must be system, light, or dark.`);
+  }
+  if (
+    CONTRAST_SETTING_ID in defaults &&
+    !CONTRAST_VALUES.includes(defaults[CONTRAST_SETTING_ID])
+  ) {
+    fail(`preferences.defaults.${CONTRAST_SETTING_ID} must be system, normal, high, or low.`);
+  }
+
+  const localeIds = new Set(configuredLocales(config).map((locale) => locale.id));
+  if (LOCALE_SETTING_ID in defaults && !localeIds.has(defaults[LOCALE_SETTING_ID])) {
+    fail(`preferences.defaults.${LOCALE_SETTING_ID} must name a configured locale.`);
+  }
+
+  if (preferences.messages != null) {
+    if (typeof preferences.messages !== "object" || Array.isArray(preferences.messages)) {
+      fail("preferences.messages must be an object keyed by configured locale.");
+    }
+    for (const [locale, messages] of Object.entries(preferences.messages)) {
+      if (!localeIds.has(locale)) {
+        fail(`preferences.messages.${locale} does not name a configured locale.`);
+      }
+      if (!messages || typeof messages !== "object" || Array.isArray(messages)) {
+        fail(`preferences.messages.${locale} must be an object.`);
+      }
+      for (const [key, value] of Object.entries(messages)) {
+        if (!key || typeof value !== "string") {
+          fail(`preferences.messages.${locale} must contain string message values.`);
+        }
+      }
     }
   }
 }
@@ -244,38 +331,51 @@ async function pathExists(path) {
 
 function renderPage(config, page) {
   const project = config.project;
-  const title = page === "overview" ? project.name : `${titleCase(page)} · ${project.name}`;
-  const body = page === "overview" ? renderOverview(config) : renderEvidenceSurface(page);
+  const defaults = preferenceDefaults(config);
+  const locale = defaults[LOCALE_SETTING_ID];
+  const pageLabel =
+    page === "stats"
+      ? translate(config, locale, "stats.title")
+      : page === "evidence"
+        ? translate(config, locale, "evidence.title")
+        : null;
+  const title = page === "overview" ? project.name : `${pageLabel} · ${project.name}`;
+  const body = page === "overview" ? renderOverview(config, locale) : renderEvidenceSurface(config, page, locale);
   const configJson = JSON.stringify(config).replaceAll("<", "\\u003c");
+  const t = (key) => escapeHtml(translate(config, locale, key));
   return `<!doctype html>
-<html lang="en">
+<html lang="${escapeHtml(locale)}" dir="${isRtlLocale(locale) ? "rtl" : "ltr"}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
     <title>${escapeHtml(title)}</title>
     <meta name="description" content="${escapeHtml(project.description ?? "Project evidence and documentation")}" />
+    <script>${renderPreferenceBootstrap(config)}</script>
     <link rel="stylesheet" href="${project.basePath}assets/site.css" />
   </head>
   <body data-page="${page}">
-    <a class="skip-link" href="#main">Skip to content</a>
+    <a class="skip-link" href="#main" data-i18n="skip.content">${t("skip.content")}</a>
     <header class="site-header">
       <div class="site-header__inner">
         <a class="site-brand" href="${project.basePath}">${escapeHtml(project.name)}</a>
-        <nav aria-label="Project">
-          ${navLink(config, "Overview", project.basePath, page === "overview")}
-          ${navLink(config, "Stats", `${project.basePath}stats/`, page === "stats")}
-          ${navLink(config, "Evidence", `${project.basePath}evidence/`, page === "evidence")}
-          ${(config.links ?? []).map((link) => navLink(config, link.label, link.href, false)).join("\n          ")}
-        </nav>
+        <div class="site-header__actions">
+          <nav class="site-nav" aria-label="${t("nav.project")}" data-i18n-aria-label="nav.project">
+            ${navLink(translate(config, locale, "nav.overview"), project.basePath, page === "overview", "nav.overview")}
+            ${navLink(translate(config, locale, "nav.stats"), `${project.basePath}stats/`, page === "stats", "nav.stats")}
+            ${navLink(translate(config, locale, "nav.evidence"), `${project.basePath}evidence/`, page === "evidence", "nav.evidence")}
+            ${(config.links ?? []).map((link) => navLink(link.label, link.href, false)).join("\n            ")}
+          </nav>
+          ${renderPreferenceMenu(config, locale)}
+        </div>
       </div>
     </header>
     <main id="main" class="site-main">
       ${body}
     </main>
     <footer class="site-footer">
-      <span>Evidence is observational and revision-bound; missing or malformed evidence is never treated as success.</span>
-      <a href="https://github.com/${escapeHtml(project.repository)}">Repository</a>
+      <span data-i18n="footer.evidence">${t("footer.evidence")}</span>
+      <a href="https://github.com/${escapeHtml(project.repository)}" data-i18n="footer.repository">${t("footer.repository")}</a>
     </footer>
     <script>window.__PROJECT_PAGES_CONFIG__ = ${configJson};</script>
     <script type="module" src="${project.basePath}assets/site-runtime.js"></script>
@@ -283,8 +383,62 @@ function renderPage(config, page) {
 </html>\n`;
 }
 
-function renderOverview(config) {
+function renderPreferenceBootstrap(config) {
+  const defaults = preferenceDefaults(config);
+  const locales = configuredLocales(config).map((locale) => locale.id);
+  const payload = JSON.stringify({ key: PREFERENCE_STORAGE_KEY, defaults, locales }).replaceAll(
+    "<",
+    "\\u003c",
+  );
+  return `(function(settings){try{var stored=JSON.parse(localStorage.getItem(settings.key)||"{}");var values=Object.assign({},settings.defaults,stored);var scheme=values[${JSON.stringify(COLOR_SCHEME_SETTING_ID)}];if(scheme==="light"||scheme==="dark")document.documentElement.dataset.colorScheme=scheme;var contrast=values[${JSON.stringify(CONTRAST_SETTING_ID)}];if(contrast==="normal"||contrast==="high"||contrast==="low")document.documentElement.dataset.contrast=contrast;var locale=values[${JSON.stringify(LOCALE_SETTING_ID)}];if(settings.locales.includes(locale)){document.documentElement.lang=locale;document.documentElement.dir=/^(ar|fa|he|ur)(-|_|$)/i.test(locale)?"rtl":"ltr";}}catch(_error){}})(${payload});`;
+}
+
+function renderPreferenceMenu(config, locale) {
+  const defaults = preferenceDefaults(config);
+  const t = (key) => escapeHtml(translate(config, locale, key));
+  return `<details class="site-preferences">
+            <summary data-i18n="preferences.summary">${t("preferences.summary")}</summary>
+            <div class="site-preferences__panel">
+              <p class="site-preferences__description" data-i18n="preferences.description">${t("preferences.description")}</p>
+              <form id="site-preferences-form" class="site-preferences__form">
+                <label>
+                  <span data-i18n="preferences.theme">${t("preferences.theme")}</span>
+                  <select data-preference-id="${COLOR_SCHEME_SETTING_ID}">
+                    ${preferenceOption("system", defaults[COLOR_SCHEME_SETTING_ID], t("preferences.theme.system"), "preferences.theme.system")}
+                    ${preferenceOption("light", defaults[COLOR_SCHEME_SETTING_ID], t("preferences.theme.light"), "preferences.theme.light")}
+                    ${preferenceOption("dark", defaults[COLOR_SCHEME_SETTING_ID], t("preferences.theme.dark"), "preferences.theme.dark")}
+                  </select>
+                </label>
+                <label>
+                  <span data-i18n="preferences.contrast">${t("preferences.contrast")}</span>
+                  <select data-preference-id="${CONTRAST_SETTING_ID}">
+                    ${preferenceOption("system", defaults[CONTRAST_SETTING_ID], t("preferences.contrast.system"), "preferences.contrast.system")}
+                    ${preferenceOption("normal", defaults[CONTRAST_SETTING_ID], t("preferences.contrast.normal"), "preferences.contrast.normal")}
+                    ${preferenceOption("high", defaults[CONTRAST_SETTING_ID], t("preferences.contrast.high"), "preferences.contrast.high")}
+                    ${preferenceOption("low", defaults[CONTRAST_SETTING_ID], t("preferences.contrast.low"), "preferences.contrast.low")}
+                  </select>
+                </label>
+                <label>
+                  <span data-i18n="preferences.language">${t("preferences.language")}</span>
+                  <select data-preference-id="${LOCALE_SETTING_ID}">
+                    ${configuredLocales(config)
+                      .map((item) => preferenceOption(item.id, defaults[LOCALE_SETTING_ID], escapeHtml(item.label)))
+                      .join("\n                    ")}
+                  </select>
+                </label>
+                <button type="button" id="site-preferences-reset" data-i18n="preferences.reset">${t("preferences.reset")}</button>
+              </form>
+            </div>
+          </details>`;
+}
+
+function preferenceOption(value, selected, label, messageKey = null) {
+  return `<option value="${escapeHtml(value)}"${value === selected ? " selected" : ""}${messageKey ? ` data-i18n="${messageKey}"` : ""}>${label}</option>`;
+}
+
+function renderOverview(config, locale) {
   const project = config.project;
+  const t = (key) => escapeHtml(translate(config, locale, key));
   return `<section class="hero" aria-labelledby="project-title">
         <p class="eyebrow">${escapeHtml(project.kicker ?? project.repository)}</p>
         <h1 id="project-title">${escapeHtml(project.name)}</h1>
@@ -294,28 +448,25 @@ function renderOverview(config) {
         </div>
       </section>
       <section class="content-section" aria-labelledby="evidence-summary-title">
-        <h2 id="evidence-summary-title">Measured project evidence</h2>
-        <p>Stats and accomplishments are rendered from explicit evidence producers. The template does not reinterpret benchmark semantics or manufacture a synthetic quality score.</p>
-        <p><a href="${project.basePath}stats/">View stats</a> · <a href="${project.basePath}evidence/">Inspect evidence provenance</a></p>
+        <h2 id="evidence-summary-title" data-i18n="overview.evidenceTitle">${t("overview.evidenceTitle")}</h2>
+        <p data-i18n="overview.evidenceBody">${t("overview.evidenceBody")}</p>
+        <p><a href="${project.basePath}stats/" data-i18n="overview.viewStats">${t("overview.viewStats")}</a> · <a href="${project.basePath}evidence/" data-i18n="overview.inspectEvidence">${t("overview.inspectEvidence")}</a></p>
       </section>`;
 }
 
-function renderEvidenceSurface(page) {
+function renderEvidenceSurface(config, page, locale) {
+  const t = (key) => escapeHtml(translate(config, locale, key));
   if (page === "stats") {
-    return `<section class="page-heading"><p class="eyebrow">Measured evidence</p><h1>Stats</h1><p>Current measurements remain separate by producer and evidence family.</p></section>
-      <section class="content-section" aria-labelledby="stats-title"><h2 id="stats-title">Current measurements</h2><div id="stats-status" class="status-line" aria-live="polite">Loading published evidence…</div><div class="table-scroll"><table><thead><tr><th scope="col">Metric</th><th scope="col">Value</th><th scope="col">State</th><th scope="col">Source</th></tr></thead><tbody id="stats-table"></tbody></table></div></section>
-      <section class="content-section" aria-labelledby="accomplishments-title"><h2 id="accomplishments-title">Accomplishments</h2><div id="accomplishments"></div></section>`;
+    return `<section class="page-heading"><p class="eyebrow" data-i18n="stats.eyebrow">${t("stats.eyebrow")}</p><h1 data-i18n="stats.title">${t("stats.title")}</h1><p data-i18n="stats.intro">${t("stats.intro")}</p></section>
+      <section class="content-section" aria-labelledby="stats-title"><h2 id="stats-title" data-i18n="stats.currentTitle">${t("stats.currentTitle")}</h2><div id="stats-status" class="status-line" aria-live="polite" data-i18n="stats.loading">${t("stats.loading")}</div><div class="table-scroll"><table><thead><tr><th scope="col" data-i18n="stats.table.metric">${t("stats.table.metric")}</th><th scope="col" data-i18n="stats.table.value">${t("stats.table.value")}</th><th scope="col" data-i18n="stats.table.state">${t("stats.table.state")}</th><th scope="col" data-i18n="stats.table.source">${t("stats.table.source")}</th></tr></thead><tbody id="stats-table"></tbody></table></div></section>
+      <section class="content-section" aria-labelledby="accomplishments-title"><h2 id="accomplishments-title" data-i18n="stats.accomplishmentsTitle">${t("stats.accomplishmentsTitle")}</h2><div id="accomplishments"></div></section>`;
   }
-  return `<section class="page-heading"><p class="eyebrow">Provenance</p><h1>Evidence</h1><p>Each source retains its producer, freshness, revision, and retrieval state.</p></section>
-      <section class="content-section"><div id="evidence-status" class="status-line" aria-live="polite">Loading evidence sources…</div><div class="table-scroll"><table><thead><tr><th scope="col">Source</th><th scope="col">State</th><th scope="col">Revision</th><th scope="col">Producer</th></tr></thead><tbody id="evidence-table"></tbody></table></div></section>`;
+  return `<section class="page-heading"><p class="eyebrow" data-i18n="evidence.eyebrow">${t("evidence.eyebrow")}</p><h1 data-i18n="evidence.title">${t("evidence.title")}</h1><p data-i18n="evidence.intro">${t("evidence.intro")}</p></section>
+      <section class="content-section"><div id="evidence-status" class="status-line" aria-live="polite" data-i18n="evidence.loading">${t("evidence.loading")}</div><div class="table-scroll"><table><thead><tr><th scope="col" data-i18n="evidence.table.source">${t("evidence.table.source")}</th><th scope="col" data-i18n="evidence.table.repository">${t("evidence.table.repository")}</th><th scope="col" data-i18n="evidence.table.producer">${t("evidence.table.producer")}</th><th scope="col" data-i18n="evidence.table.state">${t("evidence.table.state")}</th><th scope="col" data-i18n="evidence.table.generated">${t("evidence.table.generated")}</th><th scope="col" data-i18n="evidence.table.evidenceRevision">${t("evidence.table.evidenceRevision")}</th><th scope="col" data-i18n="evidence.table.currentRevision">${t("evidence.table.currentRevision")}</th><th scope="col" data-i18n="evidence.table.diagnostic">${t("evidence.table.diagnostic")}</th></tr></thead><tbody id="evidence-table"></tbody></table></div></section>`;
 }
 
-function navLink(_config, label, href, current) {
-  return `<a href="${escapeHtml(href)}"${current ? ' aria-current="page"' : ""}>${escapeHtml(label)}</a>`;
-}
-
-function titleCase(value) {
-  return value.charAt(0).toUpperCase() + value.slice(1);
+function navLink(label, href, current, messageKey = null) {
+  return `<a href="${escapeHtml(href)}"${current ? ' aria-current="page"' : ""}${messageKey ? ` data-i18n="${messageKey}"` : ""}>${escapeHtml(label)}</a>`;
 }
 
 function escapeHtml(value) {
