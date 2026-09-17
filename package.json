@@ -40,7 +40,7 @@
   },
   "scripts": {
     "build:site": "node ./bin/github-pages-template.mjs build --config ./site/pages.config.json --out ./dist",
-    "pack:check": "node ./scripts/verify-package.mjs",
+    "pack:check": "node ./scripts/verify-package.mjs && node ./scripts/verify-packed-consumer.mjs",
     "prepublishOnly": "npm run verify:release",
     "test": "node --test",
     "verify:release": "npm test && npm run build:site && npm run pack:check && node ./scripts/verify-release.mjs"
