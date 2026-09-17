@@ -348,6 +348,109 @@ td[data-state="failed"] {
   font-size: 0.9rem;
 }
 
+.site-quick-preferences {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex: none;
+}
+
+.quick-control {
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  background: var(--surface);
+  color: CanvasText;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.quick-control:hover {
+  border-color: color-mix(in srgb, currentColor 32%, transparent);
+}
+
+.quick-control[aria-current="page"] {
+  border-color: currentColor;
+  font-weight: 680;
+}
+
+.quick-control__icon {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+}
+
+.quick-control__category {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.theme-toggle__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 650;
+}
+
+.theme-toggle[data-theme-state="light"] .theme-toggle__dark,
+.theme-toggle[data-theme-state="dark"] .theme-toggle__light {
+  display: none;
+}
+
+.quick-control--language {
+  padding-inline-end: 0.3rem;
+}
+
+.quick-control--language select {
+  width: auto;
+  min-width: 6.25rem;
+  min-height: 2rem;
+  border: 0;
+  padding-block: 0.25rem;
+  background-color: transparent;
+}
+
+.preferences-page {
+  max-width: 42rem;
+}
+
+.preferences-page__form {
+  display: grid;
+  gap: 1rem;
+}
+
+.preferences-page__field {
+  display: grid;
+  gap: 0.4rem;
+  font-weight: 650;
+}
+
+.preferences-page__form button {
+  justify-self: start;
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 64rem) {
+  .site-header__inner {
+    align-items: flex-start;
+    padding-block: 0.75rem;
+  }
+
+  .site-header__actions {
+    flex-wrap: wrap;
+  }
+
+  .site-nav {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+  }
+}
+
 @media (max-width: 42rem) {
   .site-header {
     position: static;
@@ -370,6 +473,7 @@ td[data-state="failed"] {
 
   .site-nav {
     gap: 0.65rem 1rem;
+    justify-content: flex-start;
   }
 
   .site-preferences__panel {
@@ -377,6 +481,26 @@ td[data-state="failed"] {
     width: 100%;
     margin-top: 0.5rem;
     box-shadow: none;
+  }
+
+  .site-quick-preferences {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .quick-control {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .quick-control--language {
+    flex-basis: 100%;
+  }
+
+  .quick-control--language select {
+    flex: 1;
+    min-width: 0;
   }
 
   th,
