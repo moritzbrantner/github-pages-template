@@ -495,3 +495,296 @@ function MetricCharts({ results, t }: { results: EvidenceResult[]; t: Translate 
   );
 }
 
+
+function EvidencePage({
+  config,
+  locale,
+  results,
+  loading,
+  t,
+}: {
+  config: ProjectPagesConfig;
+  locale: string;
+  results: EvidenceResult[];
+  loading: boolean;
+  t: Translate;
+}) {
+  const diagnostics = useMemo(
+    () => buildEvidenceDiagnostics(results, config.project.repository),
+    [config.project.repository, results],
+  );
+
+  const columns = useMemo<Array<TableColumnDef<EvidenceDiagnostic>>>(
+    () => [
+      {
+        id: "source",
+        header: t("evidence.table.source"),
+        accessor: (row) => row.source.label,
+        cell: (_value, row) => (
+          <span id={evidenceAnchor(row.source.id)}>
+            <a href={row.source.url}>{row.source.label}</a>
+          </span>
+        ),
+      },
+      {
+        id: "repository",
+        header: t("evidence.table.repository"),
+        accessor: (row) => row.repository ?? t("common.unknown"),
+      },
+      { id: "producer", header: t("evidence.table.producer"), accessor: "producer" },
+      {
+        id: "state",
+        header: t("evidence.table.state"),
+        accessor: "state",
+        cell: (_value, row) => (
+          <span className={`evidence-state evidence-state--${stateKey(row.state)}`}>
+            {row.state}
+          </span>
+        ),
+      },
+      {
+        id: "generated",
+        header: t("evidence.table.generated"),
+        accessor: (row) => row.generatedAt ?? t("common.unknown"),
+        cell: (_value, row) => (
+          <TimeValue locale={locale} value={row.generatedAt} fallback={t("common.unknown")} />
+        ),
+      },
+      {
+        id: "evidenceRevision",
+        header: t("evidence.table.evidenceRevision"),
+        accessor: (row) => row.evidenceRevision ?? t("common.unknown"),
+        cell: (_value, row) => (
+          <RevisionValue value={row.evidenceRevision} fallback={t("common.unknown")} />
+        ),
+      },
+      {
+        id: "currentRevision",
+        header: t("evidence.table.currentRevision"),
+        accessor: (row) => row.currentRevision ?? t("common.unknown"),
+        cell: (_value, row) => (
+          <RevisionValue value={row.currentRevision} fallback={t("common.unknown")} />
+        ),
+      },
+      {
+        id: "diagnostic",
+        header: t("evidence.table.diagnostic"),
+        accessor: (row) => row.diagnostic.code,
+        cell: (_value, row) => (
+          <span className="diagnostic-cell">
+            <strong>{row.diagnostic.code}</strong>
+            <small>{row.diagnostic.message}</small>
+          </span>
+        ),
+      },
+    ],
+    [locale, t],
+  );
+
+  const attention = diagnostics.filter((item) => item.diagnostic.code !== "current").length;
+  const status = loading
+    ? t("evidence.loading")
+    : attention > 0
+      ? t("evidence.status.attention", {
+          attention: formatNumber(locale, attention),
+          total: formatNumber(locale, diagnostics.length),
+        })
+      : t(diagnostics.length === 1 ? "evidence.status.currentOne" : "evidence.status.currentMany", {
+          total: formatNumber(locale, diagnostics.length),
+        });
+
+  return (
+    <>
+      <section className="page-heading">
+        <p className="eyebrow">{t("evidence.eyebrow")}</p>
+        <h1>{t("evidence.title")}</h1>
+        <p>{t("evidence.intro")}</p>
+      </section>
+      <section className="content-section">
+        <div className="status-line" aria-live="polite">{status}</div>
+        <div className="shared-table shared-table--evidence">
+          <Table
+            ariaLabel={t("evidence.title")}
+            columns={columns}
+            density="compact"
+            emptyState={loading ? t("evidence.loading") : t("common.unavailable")}
+            rowKey={(row) => row.source.id}
+            rows={diagnostics}
+            striped
+          />
+        </div>
+      </section>
+    </>
+  );
+}
+
+function TimeValue({ value, fallback, locale }: { value: string | null; fallback: string; locale: string }) {
+  if (!value) return <>{fallback}</>;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return <>{value}</>;
+  return <time dateTime={value} title={value}>{date.toLocaleString(locale)}</time>;
+}
+
+function RevisionValue({ value, fallback }: { value: string | null; fallback: string }) {
+  return value ? <code title={value}>{shortRevision(value)}</code> : <>{fallback}</>;
+}
+
+function evidenceAnchor(sourceId: string) {
+  return `source-${String(sourceId || "unknown").replace(/[^A-Za-z0-9_-]/g, "-")}`;
+}
+
+function usePreferences(config: ProjectPagesConfig): PreferencesController {
+  const [overrides, setOverrides] = useState<PreferenceOverrides>(() =>
+    readPreferenceOverrides(safeStorage(), config),
+  );
+  const effective = useMemo(() => effectivePreferences(config, overrides), [config, overrides]);
+  const systemDark = useSystemDark();
+  const resolvedColorScheme = resolveColorScheme(effective, { matches: systemDark });
+
+  useEffect(() => {
+    applyDocumentPreferences(document, effective);
+  }, [effective]);
+
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== PREFERENCE_STORAGE_KEY) return;
+      setOverrides(readPreferenceOverrides(safeStorage(), config));
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [config]);
+
+  const setPreference = useCallback(
+    (id: keyof PreferenceValues, value: string) => {
+      setOverrides((current) =>
+        writePreferenceOverrides(safeStorage(), config, { ...current, [id]: value }),
+      );
+    },
+    [config],
+  );
+
+  const reset = useCallback(() => {
+    setOverrides(writePreferenceOverrides(safeStorage(), config, {}));
+  }, [config]);
+
+  return { effective, resolvedColorScheme, setPreference, reset };
+}
+
+function useSystemDark() {
+  const [matches, setMatches] = useState(
+    () => window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false,
+  );
+  useEffect(() => {
+    const media = window.matchMedia?.("(prefers-color-scheme: dark)");
+    if (!media) return;
+    const onChange = () => setMatches(media.matches);
+    media.addEventListener?.("change", onChange);
+    return () => media.removeEventListener?.("change", onChange);
+  }, []);
+  return matches;
+}
+
+function safeStorage() {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function useRawEvidence(config: ProjectPagesConfig) {
+  const [state, setState] = useState<{ loading: boolean; results: EvidenceResult[] }>({
+    loading: true,
+    results: [],
+  });
+
+  useEffect(() => {
+    let disposed = false;
+    setState((current) => ({ ...current, loading: true }));
+    void Promise.all((config.evidenceSources ?? []).map((source) => readSource(config, source))).then(
+      (results) => {
+        if (!disposed) setState({ loading: false, results });
+      },
+    );
+    return () => {
+      disposed = true;
+    };
+  }, [config]);
+
+  return state;
+}
+
+async function readSource(config: ProjectPagesConfig, source: EvidenceSource): Promise<EvidenceResult> {
+  try {
+    const payload =
+      source.kind === "coding-tooling-analysis-v1"
+        ? await readCodingToolingBrowserSource(source)
+        : await fetchJsonSource(source);
+    const locale = effectivePreferences(
+      config,
+      readPreferenceOverrides(safeStorage(), config),
+    )[LOCALE_SETTING_ID];
+    const normalized = normalizeEvidenceSource(config, locale, source, payload);
+    return { source, state: normalized.state, payload, normalized };
+  } catch (error) {
+    return {
+      source,
+      state: "unavailable",
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function fetchJsonSource(source: EvidenceSource) {
+  const response = await fetch(source.url, { cache: "no-store" });
+  return readJsonEvidenceResponse(response);
+}
+
+function readCodingToolingBrowserSource(source: EvidenceSource): Promise<unknown> {
+  const url = new URL(source.url, location.href);
+  const repository = url.searchParams.get("repo");
+  if (!repository) {
+    return Promise.reject(new Error("coding-tooling analysis source requires ?repo=owner/repository"));
+  }
+
+  const expectedOrigin = url.origin;
+  url.searchParams.set("postMessage", "1");
+
+  return new Promise((resolve, reject) => {
+    const iframe = document.createElement("iframe");
+    iframe.hidden = true;
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.title = "coding-tooling analysis transport";
+
+    const timeout = window.setTimeout(
+      () => finish(new Error("Timed out waiting for coding-tooling analysis evidence.")),
+      30_000,
+    );
+
+    function onMessage(event: MessageEvent) {
+      const accepted = acceptCodingToolingAnalysisMessage(event, {
+        sourceWindow: iframe.contentWindow,
+        expectedOrigin,
+        repository,
+      });
+      if (!accepted) return;
+      if (accepted.error) {
+        finish(new Error(accepted.error));
+        return;
+      }
+      finish(null, accepted.analysis);
+    }
+
+    function finish(error: Error | null, payload?: unknown) {
+      window.clearTimeout(timeout);
+      window.removeEventListener("message", onMessage);
+      iframe.remove();
+      if (error) reject(error);
+      else resolve(payload);
+    }
+
+    window.addEventListener("message", onMessage);
+    iframe.src = url.href;
+    document.body.append(iframe);
+  });
+}
