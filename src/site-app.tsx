@@ -258,3 +258,240 @@ function PreferenceSelect({
   );
 }
 
+
+function EvidenceSurface({
+  config,
+  page,
+  locale,
+  t,
+}: {
+  config: ProjectPagesConfig;
+  page: "stats" | "evidence";
+  locale: string;
+  t: Translate;
+}) {
+  const raw = useRawEvidence(config);
+  const results = useMemo(() => {
+    const localized = renormalizeEvidenceResults(config, locale, raw.results);
+    return reconcileProjectEvidenceFreshness(localized, config.project.repository);
+  }, [config, locale, raw.results]);
+
+  return page === "stats" ? (
+    <StatsPage config={config} locale={locale} results={results} loading={raw.loading} t={t} />
+  ) : (
+    <EvidencePage config={config} locale={locale} results={results} loading={raw.loading} t={t} />
+  );
+}
+
+interface MetricRow {
+  id: string;
+  label: string;
+  value: string;
+  state: string;
+  source: EvidenceSource;
+  numericValue?: number | null;
+  baseline?: number | null;
+  unit?: string | null;
+}
+
+function StatsPage({
+  config,
+  locale,
+  results,
+  loading,
+  t,
+}: {
+  config: ProjectPagesConfig;
+  locale: string;
+  results: EvidenceResult[];
+  loading: boolean;
+  t: Translate;
+}) {
+  const rows = useMemo<MetricRow[]>(
+    () =>
+      results.flatMap((result) => {
+        if (!result.normalized) {
+          return [{
+            id: `${result.source.id}:unavailable`,
+            label: result.source.label,
+            value: t("common.unavailable"),
+            state: result.state,
+            source: result.source,
+          }];
+        }
+        return result.normalized.metrics.map((metric, index) => ({
+          ...metric,
+          id: `${result.source.id}:${index}:${metric.label}`,
+          source: result.source,
+        }));
+      }),
+    [results, t],
+  );
+
+  const columns = useMemo<Array<TableColumnDef<MetricRow>>>(
+    () => [
+      { id: "metric", header: t("stats.table.metric"), accessor: "label" },
+      { id: "value", header: t("stats.table.value"), accessor: "value" },
+      {
+        id: "state",
+        header: t("stats.table.state"),
+        accessor: "state",
+        cell: (_value, row) => (
+          <span className={`evidence-state evidence-state--${stateKey(row.state)}`}>
+            {stateKey(row.state) === "current" ? row.state : (
+              <a
+                href={`${config.project.basePath}evidence/#${evidenceAnchor(row.source.id)}`}
+                aria-label={t("evidence.inspectDiagnostics", {
+                  state: row.state,
+                  source: row.source.label,
+                })}
+              >
+                {row.state}
+              </a>
+            )}
+          </span>
+        ),
+      },
+      {
+        id: "source",
+        header: t("stats.table.source"),
+        accessor: (row) => row.source.label,
+        cell: (_value, row) => <a href={row.source.url}>{row.source.label}</a>,
+      },
+    ],
+    [config.project.basePath, t],
+  );
+
+  const status = loading
+    ? t("stats.loading")
+    : t(results.length === 1 ? "stats.status.oneSource" : "stats.status.manySources", {
+        measurements: formatNumber(locale, rows.length),
+        sources: formatNumber(locale, results.length),
+      });
+  const accomplishments = results.flatMap((result) =>
+    (result.normalized?.accomplishments ?? []).map((item, index) => ({
+      ...item,
+      id: `${result.source.id}:${index}`,
+      source: result.source,
+    })),
+  );
+
+  return (
+    <>
+      <section className="page-heading">
+        <p className="eyebrow">{t("stats.eyebrow")}</p>
+        <h1>{t("stats.title")}</h1>
+        <p>{t("stats.intro")}</p>
+      </section>
+      <section className="content-section" aria-labelledby="stats-title">
+        <h2 id="stats-title">{t("stats.currentTitle")}</h2>
+        <div className="status-line" aria-live="polite">{status}</div>
+        <div className="shared-table">
+          <Table
+            ariaLabel={t("stats.currentTitle")}
+            columns={columns}
+            density="compact"
+            emptyState={loading ? t("stats.loading") : t("common.unavailable")}
+            rowKey="id"
+            rows={rows}
+            striped
+          />
+        </div>
+      </section>
+      <MetricCharts results={results} t={t} />
+      <section className="content-section" aria-labelledby="accomplishments-title">
+        <h2 id="accomplishments-title">{t("stats.accomplishmentsTitle")}</h2>
+        {accomplishments.length === 0 ? (
+          <p className="muted">{t("stats.noAccomplishments")}</p>
+        ) : (
+          <ol className="accomplishment-list">
+            {accomplishments.map((item) => (
+              <li key={item.id}>
+                <strong>{item.title ?? t("stats.recordedAccomplishment")}</strong>
+                {item.detail ? <p>{item.detail}</p> : null}
+                <small>
+                  {[item.state, item.revision ? shortRevision(item.revision) : null, item.source.label]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </small>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+    </>
+  );
+}
+
+function MetricCharts({ results, t }: { results: EvidenceResult[]; t: Translate }) {
+  const groups = useMemo(() => {
+    const grouped = new Map<
+      string,
+      { id: string; label: string; rows: Array<{ label: string; current: number; baseline?: number }> }
+    >();
+
+    for (const result of results) {
+      for (const metric of result.normalized?.metrics ?? []) {
+        if (metric.numericValue == null || !Number.isFinite(metric.numericValue) || !metric.unit) continue;
+        const metricState = stateKey(metric.state);
+        if (metricState === "unavailable" || metricState === "incomplete") continue;
+        const id = `${result.source.id}:${metric.unit}`;
+        const group = grouped.get(id) ?? {
+          id,
+          label: `${result.source.label} · ${metric.unit}`,
+          rows: [],
+        };
+        group.rows.push({
+          label: metric.label,
+          current: metric.numericValue,
+          ...(metric.baseline != null ? { baseline: metric.baseline } : {}),
+        });
+        grouped.set(id, group);
+      }
+    }
+    return [...grouped.values()].filter((group) => group.rows.length >= 2);
+  }, [results]);
+
+  if (groups.length === 0) return null;
+
+  return (
+    <section className="content-section" aria-labelledby="stats-charts-title">
+      <h2 id="stats-charts-title">{t("stats.chartsTitle")}</h2>
+      <p className="muted">{t("stats.chartsIntro")}</p>
+      <div className="stats-chart-grid">
+        {groups.map((group) => {
+          const hasBaseline = group.rows.some((row) => row.baseline != null);
+          const chartConfig = {
+            current: { label: t("stats.chart.current"), color: "var(--accent)" },
+            ...(hasBaseline
+              ? { baseline: { label: t("stats.chart.baseline"), color: "var(--muted)" } }
+              : {}),
+          };
+          return (
+            <article className="stats-chart-panel" key={group.id}>
+              <h3>{group.label}</h3>
+              <ChartContainer className="stats-chart" config={chartConfig}>
+                <BarChart
+                  data={group.rows}
+                  layout="vertical"
+                  margin={{ top: 8, right: 20, bottom: 8, left: 8 }}
+                  accessibilityLayer
+                >
+                  <CartesianGrid horizontal={false} />
+                  <XAxis type="number" />
+                  <YAxis dataKey="label" type="category" width={180} tickLine={false} axisLine={false} />
+                  <Tooltip />
+                  <Bar dataKey="current" name={t("stats.chart.current")} fill="var(--color-current)" radius={3} />
+                  {hasBaseline ? (
+                    <Bar dataKey="baseline" name={t("stats.chart.baseline")} fill="var(--color-baseline)" radius={3} />
+                  ) : null}
+                </BarChart>
+              </ChartContainer>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
