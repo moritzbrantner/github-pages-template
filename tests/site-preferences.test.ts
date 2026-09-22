@@ -10,7 +10,7 @@ import {
   preferenceDefaults,
   readPreferenceOverrides,
   writePreferenceOverrides,
-} from "../src/site-preferences.js";
+} from "../build/src/site-preferences.js";
 
 function config() {
   return {

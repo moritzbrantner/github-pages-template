@@ -16,7 +16,7 @@ import {
   preferenceDefaults,
 } from "../src/site-preferences.js";
 
-const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const managedBy = "@moritzbrantner/github-pages-template";
 const coreManagedPaths = [
   "assets/site.css",
@@ -67,10 +67,10 @@ await mkdir(resolve(outDir, "evidence"), { recursive: true });
 await mkdir(resolve(outDir, "preferences"), { recursive: true });
 
 await cp(resolve(packageRoot, "src/site.css"), resolve(outDir, "assets/site.css"));
-await cp(resolve(packageRoot, "src/site-runtime.js"), resolve(outDir, "assets/site-runtime.js"));
-await cp(resolve(packageRoot, "src/site-preferences.js"), resolve(outDir, "assets/site-preferences.js"));
-await cp(resolve(packageRoot, "src/site-localization.js"), resolve(outDir, "assets/site-localization.js"));
-await cp(resolve(packageRoot, "src/evidence-source.js"), resolve(outDir, "assets/evidence-source.js"));
+await cp(resolve(packageRoot, "build/src/site-runtime.js"), resolve(outDir, "assets/site-runtime.js"));
+await cp(resolve(packageRoot, "build/src/site-preferences.js"), resolve(outDir, "assets/site-preferences.js"));
+await cp(resolve(packageRoot, "build/src/site-localization.js"), resolve(outDir, "assets/site-localization.js"));
+await cp(resolve(packageRoot, "build/src/evidence-source.js"), resolve(outDir, "assets/evidence-source.js"));
 
 const managedPaths = new Set(coreManagedPaths);
 if (!args.augment) managedPaths.add("index.html");
@@ -106,8 +106,14 @@ await writeFile(
   `${JSON.stringify(renderAgentManifest(config, args.augment ? "augment" : "full"), null, 2)}\n`,
 );
 
-function parseArgs(values) {
-  const result = { augment: false };
+type CliArguments = {
+  augment: boolean;
+  config?: string;
+  out?: string;
+};
+
+function parseArgs(values: string[]): CliArguments {
+  const result: CliArguments = { augment: false };
   for (let index = 0; index < values.length; index += 1) {
     const value = values[index];
     if (value === "--augment") {
@@ -117,7 +123,7 @@ function parseArgs(values) {
     if (value === "--config" || value === "--out") {
       const next = values[index + 1];
       if (!next) fail(`${value} requires a value.`);
-      result[value.slice(2)] = next;
+      result[value.slice(2) as "config" | "out"] = next;
       index += 1;
       continue;
     }
@@ -126,7 +132,7 @@ function parseArgs(values) {
   return result;
 }
 
-function validateConfig(config) {
+function validateConfig(config: any): void {
   if (config?.schemaVersion !== 1) fail("pages config schemaVersion must be 1.");
   if (!config?.project?.name) fail("project.name is required.");
   if (!config?.project?.repository) fail("project.repository is required.");
@@ -140,7 +146,7 @@ function validateConfig(config) {
   validatePreferences(config);
 }
 
-function validateAgentConfig(config) {
+function validateAgentConfig(config: any): void {
   const agent = config.agent;
   if (agent == null) return;
   if (typeof agent !== "object" || Array.isArray(agent)) {
@@ -167,7 +173,7 @@ function validateAgentConfig(config) {
   }
 }
 
-function validatePreferences(config) {
+function validatePreferences(config: any): void {
   const preferences = config.preferences;
   if (preferences == null) return;
   if (typeof preferences !== "object" || Array.isArray(preferences)) {
@@ -237,13 +243,13 @@ function validatePreferences(config) {
   }
 }
 
-async function readPreviousManifest(outDir) {
+async function readPreviousManifest(outDir: string): Promise<any | null> {
   const manifestPath = resolve(outDir, "project-pages.json");
   let manifest;
   try {
     manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   } catch (error) {
-    if (error?.code === "ENOENT") return null;
+    if (isNodeError(error) && error.code === "ENOENT") return null;
     fail(
       `Cannot safely augment because existing project-pages.json is unreadable: ${
         error instanceof Error ? error.message : String(error)
@@ -262,13 +268,13 @@ async function readPreviousManifest(outDir) {
     : coreManagedPaths;
   return {
     manifest,
-    managedPaths: recordedPaths.map((path) =>
+    managedPaths: recordedPaths.map((path: string) =>
       resolveManagedOutputPath(outDir, path, "previous managed output").relativePath,
     ),
   };
 }
 
-function isTemplateManifest(manifest) {
+function isTemplateManifest(manifest: any): boolean {
   if (manifest?.managedBy === managedBy) return true;
   return (
     manifest?.schemaVersion === 1 &&
@@ -277,8 +283,8 @@ function isTemplateManifest(manifest) {
   );
 }
 
-async function prepareCopyEntries(entries, options) {
-  const prepared = [];
+async function prepareCopyEntries(entries: any[], options: any): Promise<any[]> {
+  const prepared: any[] = [];
   for (const entry of entries) {
     if (!entry?.from || !entry?.to) fail("Each copy entry needs from and to.");
     const destination = resolveManagedOutputPath(options.outDir, entry.to, "copy.to");
@@ -290,12 +296,14 @@ async function prepareCopyEntries(entries, options) {
     try {
       await lstat(source);
     } catch (error) {
-      if (error?.code === "ENOENT") fail(`copy.from '${entry.from}' does not exist.`);
+      if (isNodeError(error) && error.code === "ENOENT") {
+        fail(`copy.from '${entry.from}' does not exist.`);
+      }
       throw error;
     }
 
     if (options.augment && (await pathExists(destination.absolutePath))) {
-      const previouslyManaged = options.previousManagedPaths.some((managedPath) =>
+      const previouslyManaged = options.previousManagedPaths.some((managedPath: string) =>
         isSameOrNestedPath(destination.relativePath, managedPath),
       );
       if (!previouslyManaged) {
@@ -314,7 +322,7 @@ async function prepareCopyEntries(entries, options) {
   return prepared;
 }
 
-async function cleanupPreviousManagedOutputs(outDir, managedPaths) {
+async function cleanupPreviousManagedOutputs(outDir: string, managedPaths: string[]): Promise<void> {
   for (const path of managedPaths) {
     if (path === "index.html") continue;
     const managed = resolveManagedOutputPath(outDir, path, "previous managed output");
@@ -322,7 +330,7 @@ async function cleanupPreviousManagedOutputs(outDir, managedPaths) {
   }
 }
 
-function resolveManagedOutputPath(root, candidate, label) {
+function resolveManagedOutputPath(root: string, candidate: string, label: string) {
   if (typeof candidate !== "string" || !candidate.trim()) {
     fail(`${label} must be a non-empty relative path.`);
   }
@@ -351,21 +359,21 @@ function resolveManagedOutputPath(root, candidate, label) {
   };
 }
 
-function isSameOrNestedPath(candidate, managedPath) {
+function isSameOrNestedPath(candidate: string, managedPath: string): boolean {
   return candidate === managedPath || candidate.startsWith(`${managedPath}/`);
 }
 
-async function pathExists(path) {
+async function pathExists(path: string): Promise<boolean> {
   try {
     await lstat(path);
     return true;
   } catch (error) {
-    if (error?.code === "ENOENT") return false;
+    if (isNodeError(error) && error.code === "ENOENT") return false;
     throw error;
   }
 }
 
-function renderAgentManifest(config, mode) {
+function renderAgentManifest(config: any, mode: "augment" | "full") {
   const project = config.project;
   const routes = [
     {
@@ -400,7 +408,7 @@ function renderAgentManifest(config, mode) {
       mediaType: "text/html",
       description: "Pages presentation preferences.",
     },
-    ...(config.agent?.routes ?? []).map((route) => ({
+    ...(config.agent?.routes ?? []).map((route: any) => ({
       id: route.id,
       label: route.label,
       href: route.href,
@@ -418,7 +426,7 @@ function renderAgentManifest(config, mode) {
       kind: "manifest",
       mediaType: "application/json",
     },
-    ...(config.evidenceSources ?? []).map((source) => ({
+    ...(config.evidenceSources ?? []).map((source: any) => ({
       id: `evidence:${source.id}`,
       sourceId: source.id,
       label: source.label,
@@ -452,7 +460,7 @@ function renderAgentManifest(config, mode) {
   };
 }
 
-function renderPage(config, page) {
+function renderPage(config: any, page: string): string {
   const project = config.project;
   const defaults = preferenceDefaults(config);
   const locale = defaults[LOCALE_SETTING_ID];
@@ -472,7 +480,7 @@ function renderPage(config, page) {
         ? renderPreferencesPage(config, locale)
         : renderEvidenceSurface(config, page, locale);
   const configJson = JSON.stringify(config).replaceAll("<", "\\u003c");
-  const t = (key) => escapeHtml(translate(config, locale, key));
+  const t = (key: string) => escapeHtml(translate(config, locale, key));
   return `<!doctype html>
 <html lang="${escapeHtml(locale)}" dir="${isRtlLocale(locale) ? "rtl" : "ltr"}">
   <head>
@@ -495,7 +503,7 @@ function renderPage(config, page) {
             ${navLink(translate(config, locale, "nav.overview"), project.basePath, page === "overview", "nav.overview")}
             ${navLink(translate(config, locale, "nav.stats"), `${project.basePath}stats/`, page === "stats", "nav.stats")}
             ${navLink(translate(config, locale, "nav.evidence"), `${project.basePath}evidence/`, page === "evidence", "nav.evidence")}
-            ${(config.links ?? []).map((link) => navLink(link.label, link.href, false)).join("\n            ")}
+            ${(config.links ?? []).map((link: any) => navLink(link.label, link.href, false)).join("\n            ")}
           </nav>
           ${renderHeaderPreferences(config, locale, page)}
         </div>
@@ -514,7 +522,7 @@ function renderPage(config, page) {
 </html>\n`;
 }
 
-function renderPreferenceBootstrap(config) {
+function renderPreferenceBootstrap(config: any): string {
   const defaults = preferenceDefaults(config);
   const locales = configuredLocales(config).map((locale) => locale.id);
   const payload = JSON.stringify({ key: PREFERENCE_STORAGE_KEY, defaults, locales }).replaceAll(
@@ -524,10 +532,10 @@ function renderPreferenceBootstrap(config) {
   return `(function(settings){try{var stored=JSON.parse(localStorage.getItem(settings.key)||"{}");var values=Object.assign({},settings.defaults,stored);var scheme=values[${JSON.stringify(COLOR_SCHEME_SETTING_ID)}];if(scheme==="light"||scheme==="dark")document.documentElement.dataset.colorScheme=scheme;var contrast=values[${JSON.stringify(CONTRAST_SETTING_ID)}];if(contrast==="normal"||contrast==="high"||contrast==="low")document.documentElement.dataset.contrast=contrast;var locale=values[${JSON.stringify(LOCALE_SETTING_ID)}];if(settings.locales.includes(locale)){document.documentElement.lang=locale;document.documentElement.dir=/^(ar|fa|he|ur)(-|_|$)/i.test(locale)?"rtl":"ltr";}}catch(_error){}})(${payload});`;
 }
 
-function renderHeaderPreferences(config, locale, page) {
+function renderHeaderPreferences(config: any, locale: string, page: string): string {
   const defaults = preferenceDefaults(config);
   const initialTheme = defaults[COLOR_SCHEME_SETTING_ID] === "dark" ? "dark" : "light";
-  const t = (key) => escapeHtml(translate(config, locale, key));
+  const t = (key: string) => escapeHtml(translate(config, locale, key));
   return `<div class="site-quick-preferences">
             <button class="quick-control theme-toggle" type="button" data-preference-action="toggle-color-scheme" data-theme-state="${initialTheme}" aria-pressed="${initialTheme === "dark" ? "true" : "false"}">
               <span class="quick-control__category" data-i18n="preferences.theme">${t("preferences.theme")}</span>
@@ -550,9 +558,9 @@ function renderHeaderPreferences(config, locale, page) {
           </div>`;
 }
 
-function renderPreferenceMenu(config, locale) {
+function renderPreferenceMenu(config: any, locale: string): string {
   const defaults = preferenceDefaults(config);
-  const t = (key) => escapeHtml(translate(config, locale, key));
+  const t = (key: string) => escapeHtml(translate(config, locale, key));
   return `<details class="site-preferences">
             <summary data-i18n="preferences.summary">${t("preferences.summary")}</summary>
             <div class="site-preferences__panel">
@@ -589,9 +597,9 @@ function renderPreferenceMenu(config, locale) {
           </details>`;
 }
 
-function renderPreferencesPage(config, locale) {
+function renderPreferencesPage(config: any, locale: string): string {
   const defaults = preferenceDefaults(config);
-  const t = (key) => escapeHtml(translate(config, locale, key));
+  const t = (key: string) => escapeHtml(translate(config, locale, key));
   return `<section class="page-heading preferences-heading">
         <h1 data-i18n="preferences.summary">${t("preferences.summary")}</h1>
         <p data-i18n="preferences.description">${t("preferences.description")}</p>
@@ -629,19 +637,24 @@ function renderPreferencesPage(config, locale) {
       </section>`;
 }
 
-function preferenceOption(value, selected, label, messageKey = null) {
+function preferenceOption(
+  value: string,
+  selected: string,
+  label: string,
+  messageKey: string | null = null,
+): string {
   return `<option value="${escapeHtml(value)}"${value === selected ? " selected" : ""}${messageKey ? ` data-i18n="${messageKey}"` : ""}>${label}</option>`;
 }
 
-function renderOverview(config, locale) {
+function renderOverview(config: any, locale: string): string {
   const project = config.project;
-  const t = (key) => escapeHtml(translate(config, locale, key));
+  const t = (key: string) => escapeHtml(translate(config, locale, key));
   return `<section class="hero" aria-labelledby="project-title">
         <p class="eyebrow">${escapeHtml(project.kicker ?? project.repository)}</p>
         <h1 id="project-title">${escapeHtml(project.name)}</h1>
         <p class="lede">${escapeHtml(project.description ?? "")}</p>
         <div class="hero-links">
-          ${(config.links ?? []).map((link) => `<a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a>`).join("\n          ")}
+          ${(config.links ?? []).map((link: any) => `<a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a>`).join("\n          ")}
         </div>
       </section>
       <section class="content-section" aria-labelledby="evidence-summary-title">
@@ -651,8 +664,8 @@ function renderOverview(config, locale) {
       </section>`;
 }
 
-function renderEvidenceSurface(config, page, locale) {
-  const t = (key) => escapeHtml(translate(config, locale, key));
+function renderEvidenceSurface(config: any, page: string, locale: string): string {
+  const t = (key: string) => escapeHtml(translate(config, locale, key));
   if (page === "stats") {
     return `<section class="page-heading"><p class="eyebrow" data-i18n="stats.eyebrow">${t("stats.eyebrow")}</p><h1 data-i18n="stats.title">${t("stats.title")}</h1><p data-i18n="stats.intro">${t("stats.intro")}</p></section>
       <section class="content-section" aria-labelledby="stats-title"><h2 id="stats-title" data-i18n="stats.currentTitle">${t("stats.currentTitle")}</h2><div id="stats-status" class="status-line" aria-live="polite" data-i18n="stats.loading">${t("stats.loading")}</div><div class="table-scroll"><table><thead><tr><th scope="col" data-i18n="stats.table.metric">${t("stats.table.metric")}</th><th scope="col" data-i18n="stats.table.value">${t("stats.table.value")}</th><th scope="col" data-i18n="stats.table.state">${t("stats.table.state")}</th><th scope="col" data-i18n="stats.table.source">${t("stats.table.source")}</th></tr></thead><tbody id="stats-table"></tbody></table></div></section>
@@ -662,21 +675,27 @@ function renderEvidenceSurface(config, page, locale) {
       <section class="content-section"><div id="evidence-status" class="status-line" aria-live="polite" data-i18n="evidence.loading">${t("evidence.loading")}</div><div class="table-scroll"><table><thead><tr><th scope="col" data-i18n="evidence.table.source">${t("evidence.table.source")}</th><th scope="col" data-i18n="evidence.table.repository">${t("evidence.table.repository")}</th><th scope="col" data-i18n="evidence.table.producer">${t("evidence.table.producer")}</th><th scope="col" data-i18n="evidence.table.state">${t("evidence.table.state")}</th><th scope="col" data-i18n="evidence.table.generated">${t("evidence.table.generated")}</th><th scope="col" data-i18n="evidence.table.evidenceRevision">${t("evidence.table.evidenceRevision")}</th><th scope="col" data-i18n="evidence.table.currentRevision">${t("evidence.table.currentRevision")}</th><th scope="col" data-i18n="evidence.table.diagnostic">${t("evidence.table.diagnostic")}</th></tr></thead><tbody id="evidence-table"></tbody></table></div></section>`;
 }
 
-function icon(name) {
-  const path = {
+function icon(name: string): string {
+  const paths: Record<string, string> = {
     sun: '<circle cx="12" cy="12" r="3.5"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"></path>',
     moon: '<path d="M20.5 14.1A8.5 8.5 0 0 1 9.9 3.5 8.5 8.5 0 1 0 20.5 14.1Z"></path>',
     globe: '<circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3a14.5 14.5 0 0 1 0 18M12 3a14.5 14.5 0 0 0 0 18"></path>',
     settings: '<circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.11.36.32.7.6 1 .3.28.68.4 1.1.4h.09v4h-.09c-.42 0-.8.12-1.1.4-.28.3-.49.64-.6 1Z"></path>',
-  }[name];
+  };
+  const path = paths[name];
   return `<svg class="quick-control__icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${path ?? ""}</svg>`;
 }
 
-function navLink(label, href, current, messageKey = null) {
+function navLink(
+  label: string,
+  href: string,
+  current: boolean,
+  messageKey: string | null = null,
+): string {
   return `<a href="${escapeHtml(href)}"${current ? ' aria-current="page"' : ""}${messageKey ? ` data-i18n="${messageKey}"` : ""}>${escapeHtml(label)}</a>`;
 }
 
-function escapeHtml(value) {
+function escapeHtml(value: unknown): string {
   return String(value)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
@@ -685,7 +704,11 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function fail(message) {
+function fail(message: string): never {
   console.error(message);
   process.exit(2);
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error;
 }

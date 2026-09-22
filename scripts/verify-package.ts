@@ -9,9 +9,11 @@ assert.equal(packageJson.private, false);
 assert.equal(packageJson.repository?.url, "git+https://github.com/moritzbrantner/github-pages-template.git");
 assert.equal(packageJson.publishConfig?.registry, "https://registry.npmjs.org");
 assert.equal(packageJson.publishConfig?.access, "public");
-assert.equal(packageJson.bin?.["github-pages-template"], "./bin/github-pages-template.mjs");
-assert.equal(packageJson.exports?.["./preferences"], "./src/site-preferences.js");
-assert.equal(packageJson.exports?.["./localization"], "./src/site-localization.js");
+assert.equal(packageJson.bin?.["github-pages-template"], "./build/bin/github-pages-template.js");
+assert.equal(packageJson.exports?.["./preferences"]?.import, "./build/src/site-preferences.js");
+assert.equal(packageJson.exports?.["./preferences"]?.types, "./build/src/site-preferences.d.ts");
+assert.equal(packageJson.exports?.["./localization"]?.import, "./build/src/site-localization.js");
+assert.equal(packageJson.exports?.["./localization"]?.types, "./build/src/site-localization.d.ts");
 
 const output = execFileSync(
   "npm",
@@ -32,11 +34,15 @@ for (const path of [
   "README.md",
   "LICENSE",
   "VERSION",
-  "bin/github-pages-template.mjs",
-  "src/site-runtime.js",
-  "src/site-preferences.js",
-  "src/site-localization.js",
-  "src/evidence-source.js",
+  "build/bin/github-pages-template.js",
+  "build/src/site-runtime.js",
+  "build/src/site-runtime.d.ts",
+  "build/src/site-preferences.js",
+  "build/src/site-preferences.d.ts",
+  "build/src/site-localization.js",
+  "build/src/site-localization.d.ts",
+  "build/src/evidence-source.js",
+  "build/src/evidence-source.d.ts",
   "src/site.css",
   "docs/consumer-adoption.md",
   "docs/project-evidence-v1.md",
@@ -50,6 +56,10 @@ for (const path of files) {
   assert.ok(!path.startsWith("site/"), `reference-site source leaked into package: ${path}`);
   assert.ok(!path.startsWith("scripts/"), `release script leaked into package: ${path}`);
   assert.ok(!path.startsWith("dist/"), `generated reference site leaked into package: ${path}`);
+  assert.ok(
+    !path.endsWith(".ts") || path.endsWith(".d.ts"),
+    `authored TypeScript leaked into package: ${path}`,
+  );
 }
 
 console.log(

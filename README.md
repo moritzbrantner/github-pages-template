@@ -18,7 +18,8 @@ It deliberately does **not** own benchmark semantics, thresholds, or deployment 
 ## Build the reference site
 
 ```sh
-node ./bin/github-pages-template.mjs build \
+npm run build --silent
+node ./build/bin/github-pages-template.js build \
   --config ./site/pages.config.json \
   --out ./dist
 ```
@@ -26,8 +27,13 @@ node ./bin/github-pages-template.mjs build \
 Run the release-grade validation with:
 
 ```sh
+npm ci
+npm run typecheck
 npm run verify:release
 ```
+
+The CLI, browser runtime, tests, and verification scripts are authored in TypeScript. The
+published package contains compiled JavaScript and generated declarations for consumers.
 
 ## One-time GitHub Pages activation
 

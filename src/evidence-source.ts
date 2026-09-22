@@ -1,9 +1,71 @@
 export const CODING_TOOLING_ANALYSIS_MESSAGE_TYPE = "coding-tooling.analysis.v1";
 
+export type EvidenceSource = {
+  id: string;
+  label: string;
+  kind: string;
+  url: string;
+  producer?: string;
+};
+
+export type EvidenceMetric = {
+  label?: string;
+  value?: string | number;
+  unit?: string;
+  baseline?: number;
+  state?: string;
+  source?: EvidenceSource;
+};
+
+export type EvidenceAccomplishment = {
+  title?: string;
+  detail?: string;
+  state?: string;
+  revision?: string;
+  source?: EvidenceSource;
+};
+
+export type NormalizedEvidence = {
+  state: string;
+  repository?: string | null;
+  revision?: string | null;
+  producer: string;
+  metrics: EvidenceMetric[];
+  accomplishments: EvidenceAccomplishment[];
+};
+
+export type EvidenceResult = {
+  source: EvidenceSource;
+  state?: string;
+  payload?: any;
+  normalized?: NormalizedEvidence;
+  error?: string;
+};
+
+export type EvidenceDiagnostic = {
+  code: string;
+  message: string;
+};
+
+export type EvidenceDiagnosticRow = {
+  source: EvidenceSource;
+  repository: string | null;
+  producer: string;
+  state: string;
+  generatedAt: string | null;
+  evidenceRevision: string | null;
+  currentRevision: string | undefined;
+  diagnostic: EvidenceDiagnostic;
+};
+
 export function acceptCodingToolingAnalysisMessage(
-  event,
-  { sourceWindow, expectedOrigin, repository },
-) {
+  event: any,
+  { sourceWindow, expectedOrigin, repository }: {
+    sourceWindow: unknown;
+    expectedOrigin: string;
+    repository: string;
+  },
+): { error: string } | { analysis: any } | null {
   if (event?.source !== sourceWindow) return null;
   if (event?.origin !== expectedOrigin) return null;
 
@@ -32,12 +94,14 @@ export function acceptCodingToolingAnalysisMessage(
   return { analysis: data.analysis };
 }
 
-export async function readJsonEvidenceResponse(response) {
+export async function readJsonEvidenceResponse(
+  response: Pick<Response, "ok" | "status" | "headers" | "text">,
+): Promise<any> {
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
   const mediaType =
-    (response.headers.get("content-type") ?? "unknown content type")
-      .split(";", 1)[0]
+    ((response.headers.get("content-type") ?? "unknown content type")
+      .split(";", 1)[0] ?? "unknown content type")
       .trim()
       .toLowerCase() || "unknown content type";
   const body = await response.text();
@@ -54,14 +118,18 @@ export async function readJsonEvidenceResponse(response) {
   }
 }
 
-export function reconcileProjectEvidenceFreshness(results, expectedRepository) {
+export function reconcileProjectEvidenceFreshness(
+  results: EvidenceResult[],
+  expectedRepository: string,
+): EvidenceResult[] {
   const currentRevision = findCurrentRepositoryRevision(results, expectedRepository);
 
   return results.map((result) => {
     if (result?.source?.kind !== "project-evidence-v1" || !result?.normalized) return result;
 
-    const revision = result.normalized.revision;
-    const repository = result.normalized.repository;
+    const original = result.normalized;
+    const revision = original.revision;
+    const repository = original.repository;
     const freshness =
       repository && repository !== expectedRepository
         ? "repository mismatch"
@@ -74,18 +142,18 @@ export function reconcileProjectEvidenceFreshness(results, expectedRepository) {
               : "stale";
 
     const normalized = {
-      ...result.normalized,
+      ...original,
       state:
         freshness === "current"
-          ? appendFreshness(result.normalized.state, freshness)
+          ? appendFreshness(original.state, freshness)
           : `incomplete · ${freshness}`,
-      metrics: (result.normalized.metrics ?? []).map((metric) => ({
+      metrics: (original.metrics ?? []).map((metric) => ({
         ...metric,
-        state: appendFreshness(metric.state ?? result.normalized.state, freshness),
+        state: appendFreshness(metric.state ?? original.state, freshness),
       })),
-      accomplishments: (result.normalized.accomplishments ?? []).map((item) => ({
+      accomplishments: (original.accomplishments ?? []).map((item) => ({
         ...item,
-        state: appendFreshness(item.state ?? result.normalized.state, freshness),
+        state: appendFreshness(item.state ?? original.state, freshness),
       })),
     };
 
@@ -93,13 +161,16 @@ export function reconcileProjectEvidenceFreshness(results, expectedRepository) {
   });
 }
 
-export function buildEvidenceDiagnostics(results, expectedRepository) {
+export function buildEvidenceDiagnostics(
+  results: EvidenceResult[],
+  expectedRepository: string,
+): EvidenceDiagnosticRow[] {
   const currentRevision = findCurrentRepositoryRevision(results, expectedRepository);
 
   return results.map((result) => {
     const normalized = result?.normalized;
     const payload = result?.payload;
-    const source = result?.source ?? {};
+    const source = result.source;
     const repository = normalized?.repository ?? payload?.repository ?? sourceRepository(source) ?? null;
     const evidenceRevision = normalized?.revision ?? payload?.revision ?? null;
     const generatedAt = typeof payload?.generatedAt === "string" ? payload.generatedAt : null;
@@ -136,7 +207,15 @@ function diagnoseResult({
   expectedRepository,
   currentRevision,
   evidenceRevision,
-}) {
+}: {
+  result: EvidenceResult;
+  source: EvidenceSource;
+  payload: any;
+  normalized: NormalizedEvidence | undefined;
+  expectedRepository: string;
+  currentRevision: string | undefined;
+  evidenceRevision: string | null;
+}): EvidenceDiagnostic {
   if (!normalized) {
     const message = result?.error || "Evidence source could not be loaded.";
     const code = message.includes("repository does not match")
@@ -192,7 +271,10 @@ function diagnoseResult({
   return { code: "current", message: "Evidence identity and revision are current." };
 }
 
-function findCurrentRepositoryRevision(results, expectedRepository) {
+function findCurrentRepositoryRevision(
+  results: EvidenceResult[],
+  expectedRepository: string,
+): string | undefined {
   return results.find(
     (result) =>
       result?.source?.kind === "coding-tooling-analysis-v1" &&
@@ -200,10 +282,10 @@ function findCurrentRepositoryRevision(results, expectedRepository) {
       result?.normalized?.repository === expectedRepository &&
       typeof result?.normalized?.revision === "string" &&
       result.normalized.revision.length > 0,
-  )?.normalized?.revision;
+  )?.normalized?.revision ?? undefined;
 }
 
-function sourceRepository(source) {
+function sourceRepository(source: EvidenceSource): string | null {
   try {
     return new URL(source?.url).searchParams.get("repo");
   } catch {
@@ -211,11 +293,11 @@ function sourceRepository(source) {
   }
 }
 
-function appendFreshness(state, freshness) {
+function appendFreshness(state: string | undefined, freshness: string): string {
   return `${state ?? "unknown"} · ${freshness}`;
 }
 
-function stateKey(value) {
+function stateKey(value: unknown): string {
   const normalized = String(value ?? "unavailable").toLowerCase();
   if (normalized.includes("unavailable")) return "unavailable";
   if (

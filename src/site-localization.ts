@@ -1,4 +1,6 @@
-const BUILTIN_MESSAGES = Object.freeze({
+import type { SitePreferencesConfig } from "./site-preferences.js";
+
+const BUILTIN_MESSAGES: Readonly<Record<string, Readonly<Record<string, string>>>> = Object.freeze({
   en: Object.freeze({
     "skip.content": "Skip to content",
     "nav.project": "Project",
@@ -141,25 +143,36 @@ const BUILTIN_MESSAGES = Object.freeze({
   })
 });
 
-export function translate(config, locale, key, values = {}) {
+export function translate(
+  config: SitePreferencesConfig | null | undefined,
+  locale: string,
+  key: string,
+  values: Readonly<Record<string, unknown>> = {},
+): string {
   const configured = config?.preferences?.messages?.[locale]?.[key];
   const template =
     (typeof configured === "string" && configured) ||
     BUILTIN_MESSAGES[locale]?.[key] ||
-    BUILTIN_MESSAGES.en[key] ||
+    BUILTIN_MESSAGES.en?.[key] ||
     key;
 
-  return template.replace(/\{([A-Za-z0-9_]+)\}/g, (_match, name) =>
+  return template.replace(/\{([A-Za-z0-9_]+)\}/g, (_match: string, name: string) =>
     name in values ? String(values[name]) : `{${name}}`,
   );
 }
 
-export function applyTranslations(document, config, locale) {
+export function applyTranslations(
+  document: Document | null | undefined,
+  config: SitePreferencesConfig | null | undefined,
+  locale: string,
+): void {
   if (!document) return;
   for (const node of document.querySelectorAll("[data-i18n]")) {
-    node.textContent = translate(config, locale, node.dataset.i18n);
+    const key = (node as HTMLElement).dataset.i18n;
+    if (key) node.textContent = translate(config, locale, key);
   }
   for (const node of document.querySelectorAll("[data-i18n-aria-label]")) {
-    node.setAttribute("aria-label", translate(config, locale, node.dataset.i18nAriaLabel));
+    const key = (node as HTMLElement).dataset.i18nAriaLabel;
+    if (key) node.setAttribute("aria-label", translate(config, locale, key));
   }
 }

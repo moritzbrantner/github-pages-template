@@ -5,7 +5,7 @@ import {
   CODING_TOOLING_ANALYSIS_MESSAGE_TYPE,
   acceptCodingToolingAnalysisMessage,
   readJsonEvidenceResponse,
-} from "../src/evidence-source.js";
+} from "../build/src/evidence-source.js";
 
 const sourceWindow = {};
 const expectedOrigin = "https://moritzbrantner.github.io";

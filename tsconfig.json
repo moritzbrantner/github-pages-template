@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "declaration": true,
+    "exactOptionalPropertyTypes": true,
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": true,
+    "outDir": "build",
+    "rootDir": ".",
+    "strict": true,
+    "target": "ES2024",
+    "types": ["node"]
+  },
+  "include": ["bin/**/*.ts", "src/**/*.ts"],
+  "exclude": ["build", "dist", "node_modules"]
+}

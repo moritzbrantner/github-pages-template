@@ -64,8 +64,8 @@ jobs:
     with:
       node_version: "24"
       bun_version: ""
-      install_command: ""
-      build_command: "node ./bin/github-pages-template.mjs build --config ./site/pages.config.json --out ./dist"
+      install_command: "npm ci"
+      build_command: "npm run build:site"
       artifact_path: dist
       cache_bun: false
-      cache_node: false
+      cache_node: true

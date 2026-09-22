@@ -4,7 +4,7 @@ import test from "node:test";
 import {
   CODING_TOOLING_ANALYSIS_MESSAGE_TYPE,
   acceptCodingToolingAnalysisMessage,
-} from "../src/evidence-source.js";
+} from "../build/src/evidence-source.js";
 
 test("fails closed on unsupported coding-tooling analysis schemas", () => {
   const sourceWindow = {};

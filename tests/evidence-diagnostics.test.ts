@@ -4,7 +4,7 @@ import test from "node:test";
 import {
   buildEvidenceDiagnostics,
   reconcileProjectEvidenceFreshness,
-} from "../src/evidence-source.js";
+} from "../build/src/evidence-source.js";
 
 const repository = "moritzbrantner/maps";
 const currentRevision = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
