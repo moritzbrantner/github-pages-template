@@ -74,7 +74,8 @@ test("build creates human pages plus project and agent discovery manifests", asy
   assert.ok(
     agent.resources.some(
       (resource) =>
-        resource.id === "verification" &&
+        resource.id === "evidence:verification" &&
+        resource.sourceId === "verification" &&
         resource.href === "/fixture/evidence/project.json" &&
         resource.kind === "project-evidence-v1",
     ),
