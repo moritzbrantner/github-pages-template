@@ -4,19 +4,47 @@ import {
   readJsonEvidenceResponse,
   reconcileProjectEvidenceFreshness,
 } from "./evidence-source.js";
+import type {
+  EvidenceAccomplishment,
+  EvidenceDiagnostic,
+  EvidenceDiagnosticRow,
+  EvidenceMetric,
+  EvidenceResult,
+  EvidenceSource,
+  NormalizedEvidence,
+} from "./evidence-source.js";
 import { applyTranslations, translate } from "./site-localization.js";
-import { LOCALE_SETTING_ID, installSitePreferences } from "./site-preferences.js";
+import {
+  LOCALE_SETTING_ID,
+  installSitePreferences,
+  type SitePreferencesConfig,
+} from "./site-preferences.js";
+
+type RuntimeConfig = SitePreferencesConfig & {
+  project: {
+    name: string;
+    repository: string;
+    basePath: string;
+  };
+  evidenceSources?: EvidenceSource[];
+};
+
+declare global {
+  interface Window {
+    __PROJECT_PAGES_CONFIG__?: RuntimeConfig;
+  }
+}
 
 const config = window.__PROJECT_PAGES_CONFIG__;
 const page = document.body.dataset.page;
-let preferenceController = null;
-let renderedResults = null;
+let preferenceController: ReturnType<typeof installSitePreferences> | null = null;
+let renderedResults: EvidenceResult[] = [];
 
 if (config) {
   preferenceController = installSitePreferences(config, {
     onChange({ effective }) {
       applyPageLocalization(effective[LOCALE_SETTING_ID]);
-      if (renderedResults) rerenderEvidence();
+      if (renderedResults.length > 0) rerenderEvidence();
     },
   });
   applyPageLocalization(preferenceController.current()[LOCALE_SETTING_ID]);
@@ -26,15 +54,15 @@ if (config && (page === "stats" || page === "evidence")) {
   void loadEvidence();
 }
 
-function currentLocale() {
+function currentLocale(): string {
   return preferenceController?.current()[LOCALE_SETTING_ID] ?? document.documentElement.lang ?? "en";
 }
 
-function t(key, values = {}) {
+function t(key: string, values: Readonly<Record<string, unknown>> = {}): string {
   return translate(config, currentLocale(), key, values);
 }
 
-function applyPageLocalization(locale) {
+function applyPageLocalization(locale: string): void {
   applyTranslations(document, config, locale);
   if (!config?.project) return;
   const pageLabel =
@@ -48,13 +76,15 @@ function applyPageLocalization(locale) {
   document.title = pageLabel ? `${pageLabel} · ${config.project.name}` : config.project.name;
 }
 
-async function loadEvidence() {
-  let sources = await Promise.all((config.evidenceSources ?? []).map(readSource));
+async function loadEvidence(): Promise<void> {
+  const sources = await Promise.all((config?.evidenceSources ?? []).map(readSource));
+  if (!config) return;
   renderedResults = reconcileProjectEvidenceFreshness(sources, config.project.repository);
   renderCurrentEvidence();
 }
 
-function rerenderEvidence() {
+function rerenderEvidence(): void {
+  if (!config) return;
   renderedResults = renderedResults.map((result) => {
     if (!result.payload) return result;
     const normalized = normalizeSource(result.source, result.payload);
@@ -64,12 +94,12 @@ function rerenderEvidence() {
   renderCurrentEvidence();
 }
 
-function renderCurrentEvidence() {
+function renderCurrentEvidence(): void {
   if (page === "stats") renderStats(renderedResults);
   if (page === "evidence") renderEvidence(renderedResults);
 }
 
-async function readSource(source) {
+async function readSource(source: EvidenceSource): Promise<EvidenceResult> {
   try {
     const payload =
       source.kind === "coding-tooling-analysis-v1"
@@ -86,12 +116,12 @@ async function readSource(source) {
   }
 }
 
-async function fetchJsonSource(source) {
+async function fetchJsonSource(source: EvidenceSource): Promise<any> {
   const response = await fetch(source.url, { cache: "no-store" });
   return readJsonEvidenceResponse(response);
 }
 
-function readCodingToolingBrowserSource(source) {
+function readCodingToolingBrowserSource(source: EvidenceSource): Promise<any> {
   const url = new URL(source.url, location.href);
   const repository = url.searchParams.get("repo");
   if (!repository) {
@@ -99,11 +129,12 @@ function readCodingToolingBrowserSource(source) {
       new Error("coding-tooling analysis source requires ?repo=owner/repository"),
     );
   }
+  const requestedRepository = repository;
 
   const expectedOrigin = url.origin;
   url.searchParams.set("postMessage", "1");
 
-  return new Promise((resolve, reject) => {
+  return new Promise<any>((resolve, reject) => {
     const iframe = document.createElement("iframe");
     iframe.hidden = true;
     iframe.setAttribute("aria-hidden", "true");
@@ -113,21 +144,21 @@ function readCodingToolingBrowserSource(source) {
       finish(new Error("Timed out waiting for coding-tooling analysis evidence."));
     }, 30_000);
 
-    function onMessage(event) {
+    function onMessage(event: MessageEvent): void {
       const accepted = acceptCodingToolingAnalysisMessage(event, {
         sourceWindow: iframe.contentWindow,
         expectedOrigin,
-        repository,
+        repository: requestedRepository,
       });
       if (!accepted) return;
-      if (accepted.error) {
+      if ("error" in accepted) {
         finish(new Error(accepted.error));
         return;
       }
       finish(null, accepted.analysis);
     }
 
-    function finish(error, payload) {
+    function finish(error: Error | null, payload?: any): void {
       window.clearTimeout(timeout);
       window.removeEventListener("message", onMessage);
       iframe.remove();
@@ -141,7 +172,7 @@ function readCodingToolingBrowserSource(source) {
   });
 }
 
-function normalizeSource(source, payload) {
+function normalizeSource(source: EvidenceSource, payload: any): NormalizedEvidence {
   if (source.kind === "coding-tooling-analysis-v1") return normalizeCodingTooling(payload);
   if (source.kind === "project-evidence-v1") return normalizeProjectEvidence(payload);
   return {
@@ -153,7 +184,7 @@ function normalizeSource(source, payload) {
   };
 }
 
-function normalizeProjectEvidence(payload) {
+function normalizeProjectEvidence(payload: any): NormalizedEvidence {
   if (payload?.schemaVersion !== 1 || !Array.isArray(payload?.metrics)) {
     return {
       state: "incomplete",
@@ -170,7 +201,7 @@ function normalizeProjectEvidence(payload) {
     repository: payload.repository ?? null,
     revision: payload.revision ?? null,
     producer: payload.producer ?? "project-evidence-v1",
-    metrics: payload.metrics.map((metric) => ({
+    metrics: payload.metrics.map((metric: any) => ({
       label: metric.label ?? metric.id ?? t("common.unnamedMetric"),
       value: formatMetricValue(metric),
       state: metric.state ?? status,
@@ -179,9 +210,9 @@ function normalizeProjectEvidence(payload) {
   };
 }
 
-function normalizeCodingTooling(payload) {
+function normalizeCodingTooling(payload: any): NormalizedEvidence {
   const kpis = payload?.kpis ?? {};
-  const rows = [];
+  const rows: EvidenceMetric[] = [];
   const checklist = kpis?.work?.checklist;
   rows.push({
     label: t("coding.checklist"),
@@ -256,25 +287,27 @@ function normalizeCodingTooling(payload) {
   };
 }
 
-function renderStats(results) {
-  const table = document.querySelector("#stats-table");
-  const status = document.querySelector("#stats-status");
-  const accomplishments = document.querySelector("#accomplishments");
+function renderStats(results: EvidenceResult[]): void {
+  const table = document.querySelector<HTMLElement>("#stats-table");
+  const status = document.querySelector<HTMLElement>("#stats-status");
+  const accomplishments = document.querySelector<HTMLElement>("#accomplishments");
   if (!table || !status || !accomplishments) return;
 
-  const rows = results.flatMap((result) => {
+  const rows = results.reduce<Array<EvidenceMetric & { source: EvidenceSource }>>((items, result) => {
     if (!result.normalized) {
-      return [
-        {
-          label: result.source.label,
-          value: t("common.unavailable"),
-          state: result.state,
-          source: result.source,
-        },
-      ];
+      items.push({
+        label: result.source.label,
+        value: t("common.unavailable"),
+        ...(result.state === undefined ? {} : { state: result.state }),
+        source: result.source,
+      });
+      return items;
     }
-    return result.normalized.metrics.map((metric) => ({ ...metric, source: result.source }));
-  });
+    items.push(
+      ...result.normalized.metrics.map((metric) => ({ ...metric, source: result.source })),
+    );
+    return items;
+  }, []);
 
   table.replaceChildren(...rows.map(metricRow));
   delete status.dataset.i18n;
@@ -315,9 +348,10 @@ function renderStats(results) {
   accomplishments.replaceChildren(list);
 }
 
-function renderEvidence(results) {
-  const tableBody = document.querySelector("#evidence-table");
-  const status = document.querySelector("#evidence-status");
+function renderEvidence(results: EvidenceResult[]): void {
+  if (!config) return;
+  const tableBody = document.querySelector<HTMLElement>("#evidence-table");
+  const status = document.querySelector<HTMLElement>("#evidence-status");
   if (!tableBody || !status) return;
 
   const diagnostics = buildEvidenceDiagnostics(results, config.project.repository);
@@ -336,7 +370,7 @@ function renderEvidence(results) {
       );
 }
 
-function evidenceRow(item) {
+function evidenceRow(item: EvidenceDiagnosticRow): HTMLTableRowElement {
   const row = document.createElement("tr");
   row.id = evidenceAnchor(item.source.id);
 
@@ -360,11 +394,11 @@ function evidenceRow(item) {
   return row;
 }
 
-function metricRow(metric) {
+function metricRow(metric: EvidenceMetric & { source: EvidenceSource }): HTMLTableRowElement {
   const row = document.createElement("tr");
   const labelCell = document.createElement("th");
   labelCell.scope = "row";
-  labelCell.textContent = metric.label;
+  labelCell.textContent = metric.label ?? t("common.unnamedMetric");
   const sourceLink = document.createElement("a");
   sourceLink.href = metric.source.url;
   sourceLink.textContent = metric.source.label;
@@ -374,7 +408,8 @@ function metricRow(metric) {
   return row;
 }
 
-function metricStateCell(metric) {
+function metricStateCell(metric: EvidenceMetric & { source: EvidenceSource }): HTMLTableCellElement {
+  if (!config) return stateCell(metric.state);
   const td = stateCell(metric.state);
   if (stateKey(metric.state) === "current" || !metric.source?.id) return td;
 
@@ -389,7 +424,7 @@ function metricStateCell(metric) {
   return td;
 }
 
-function diagnosticCell(diagnostic) {
+function diagnosticCell(diagnostic: EvidenceDiagnostic): HTMLTableCellElement {
   const td = document.createElement("td");
   const strong = document.createElement("strong");
   strong.textContent = diagnostic.code;
@@ -399,7 +434,7 @@ function diagnosticCell(diagnostic) {
   return td;
 }
 
-function timeCell(value) {
+function timeCell(value: string | null): HTMLTableCellElement {
   const td = document.createElement("td");
   if (!value) {
     td.textContent = t("common.unknown");
@@ -418,7 +453,7 @@ function timeCell(value) {
   return td;
 }
 
-function revisionCell(value) {
+function revisionCell(value: string | null | undefined): HTMLTableCellElement {
   const td = document.createElement("td");
   if (!value) {
     td.textContent = t("common.unknown");
@@ -431,30 +466,30 @@ function revisionCell(value) {
   return td;
 }
 
-function evidenceAnchor(sourceId) {
+function evidenceAnchor(sourceId: unknown): string {
   return `source-${String(sourceId ?? "unknown").replace(/[^A-Za-z0-9_-]/g, "-")}`;
 }
 
-function cell(value) {
+function cell(value: unknown): HTMLTableCellElement {
   const td = document.createElement("td");
-  td.textContent = value ?? t("common.unavailable");
+  td.textContent = value == null ? t("common.unavailable") : String(value);
   return td;
 }
 
-function stateCell(value) {
+function stateCell(value: unknown): HTMLTableCellElement {
   const td = cell(value ?? "unavailable");
   td.dataset.state = stateKey(value);
   return td;
 }
 
-function paragraph(text) {
+function paragraph(text: string): HTMLParagraphElement {
   const p = document.createElement("p");
   p.className = "muted";
   p.textContent = text;
   return p;
 }
 
-function formatMetricValue(metric) {
+function formatMetricValue(metric: EvidenceMetric): string {
   if (metric.value == null) return t("common.unavailable");
   const value = typeof metric.value === "number" ? formatNumber(metric.value) : String(metric.value);
   const unit = metric.unit ? ` ${metric.unit}` : "";
@@ -465,34 +500,36 @@ function formatMetricValue(metric) {
   return `${value}${unit}${baseline}`;
 }
 
-function coverageValue(metric) {
+function coverageValue(metric: any): string {
   if (!metric || metric.covered == null || metric.total == null) return t("common.unavailable");
   return `${formatNumber(metric.covered)}/${formatNumber(metric.total)} · ${formatPercent(metric.percent)}`;
 }
 
-function ratioValue(numerator, denominator) {
+function ratioValue(numerator: unknown, denominator: unknown): string {
   if (numerator == null || denominator == null) return t("common.unavailable");
-  if (denominator === 0) return t("coding.discoveredZero");
-  return `${formatNumber(numerator)}/${formatNumber(denominator)} · ${formatPercent((numerator / denominator) * 100)}`;
+  const numericNumerator = Number(numerator);
+  const numericDenominator = Number(denominator);
+  if (numericDenominator === 0) return t("coding.discoveredZero");
+  return `${formatNumber(numerator)}/${formatNumber(denominator)} · ${formatPercent((numericNumerator / numericDenominator) * 100)}`;
 }
 
-function kpiState(kpi) {
+function kpiState(kpi: any): string {
   if (!kpi) return "unavailable";
   return joinState(kpi.status ?? "unavailable", kpi.freshness ?? "unknown");
 }
 
-function joinState(status, freshness) {
+function joinState(status: string, freshness: string): string {
   return freshness && freshness !== "unknown" ? `${status} · ${freshness}` : status;
 }
 
-function aggregateState(states) {
+function aggregateState(states: string[]): string {
   if (states.some((value) => stateKey(value) === "unavailable")) return "incomplete";
   if (states.some((value) => stateKey(value) === "incomplete")) return "incomplete";
   if (states.some((value) => String(value).includes("stale"))) return "incomplete · stale";
   return "current";
 }
 
-function stateKey(value) {
+function stateKey(value: unknown): string {
   const normalized = String(value ?? "unavailable").toLowerCase();
   if (normalized.includes("unavailable")) return "unavailable";
   if (
@@ -508,7 +545,7 @@ function stateKey(value) {
   return "unknown";
 }
 
-function formatPercent(value) {
+function formatPercent(value: unknown): string {
   if (!Number.isFinite(Number(value))) return "n/a";
   return new Intl.NumberFormat(currentLocale(), {
     style: "percent",
@@ -516,12 +553,12 @@ function formatPercent(value) {
   }).format(Number(value) / 100);
 }
 
-function formatNumber(value) {
+function formatNumber(value: unknown): string {
   return Number.isFinite(Number(value))
     ? new Intl.NumberFormat(currentLocale()).format(Number(value))
     : String(value);
 }
 
-function shortRevision(value) {
+function shortRevision(value: unknown): string {
   return String(value).slice(0, 12);
 }

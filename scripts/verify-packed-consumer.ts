@@ -114,7 +114,7 @@ async function verifyConsumer({ root, tarball, mode, repository }) {
   assert.equal(installedPackage.version, packageJson.version);
   await lstat(join(root, "node_modules", ".bin", "github-pages-template"));
 
-  const cli = join(installedRoot, "bin", "github-pages-template.mjs");
+  const cli = join(installedRoot, "build", "bin", "github-pages-template.js");
   execFileSync(
     process.execPath,
     [

@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 import test from "node:test";
 
 const execFileAsync = promisify(execFile);
-const cli = resolve("bin/github-pages-template.mjs");
+const cli = resolve("build/bin/github-pages-template.js");
 
 function config() {
   return {

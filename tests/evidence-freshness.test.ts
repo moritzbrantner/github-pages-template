@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { reconcileProjectEvidenceFreshness } from "../src/evidence-source.js";
+import { reconcileProjectEvidenceFreshness } from "../build/src/evidence-source.js";
 
 const repository = "moritzbrantner/maps";
 

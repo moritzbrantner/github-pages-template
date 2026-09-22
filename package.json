@@ -5,6 +5,7 @@
   "description": "Shared static GitHub Pages foundation for project overview, stats, accomplishments, and evidence.",
   "license": "MIT",
   "type": "module",
+  "packageManager": "npm@11.9.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/moritzbrantner/github-pages-template.git"
@@ -20,20 +21,30 @@
     "project-template"
   ],
   "files": [
-    "bin",
-    "src",
+    "build/bin",
+    "build/src",
+    "src/site.css",
     "docs",
     "README.md",
     "LICENSE",
     "VERSION"
   ],
   "bin": {
-    "github-pages-template": "./bin/github-pages-template.mjs"
+    "github-pages-template": "./build/bin/github-pages-template.js"
   },
   "exports": {
-    "./runtime": "./src/site-runtime.js",
-    "./preferences": "./src/site-preferences.js",
-    "./localization": "./src/site-localization.js",
+    "./runtime": {
+      "types": "./build/src/site-runtime.d.ts",
+      "import": "./build/src/site-runtime.js"
+    },
+    "./preferences": {
+      "types": "./build/src/site-preferences.d.ts",
+      "import": "./build/src/site-preferences.js"
+    },
+    "./localization": {
+      "types": "./build/src/site-localization.d.ts",
+      "import": "./build/src/site-localization.js"
+    },
     "./styles.css": "./src/site.css"
   },
   "publishConfig": {
@@ -41,11 +52,18 @@
     "access": "public"
   },
   "scripts": {
-    "build:site": "node ./bin/github-pages-template.mjs build --config ./site/pages.config.json --out ./dist",
-    "pack:check": "node ./scripts/verify-package.mjs && node ./scripts/verify-packed-consumer.mjs",
+    "build": "tsc --project tsconfig.json",
+    "build:site": "npm run build && node ./build/bin/github-pages-template.js build --config ./site/pages.config.json --out ./dist",
+    "pack:check": "npm run build && node ./scripts/verify-package.ts && node ./scripts/verify-packed-consumer.ts",
+    "prepack": "npm run build",
     "prepublishOnly": "npm run verify:release",
-    "test": "node --test",
-    "verify:release": "npm test && npm run build:site && npm run pack:check && node ./scripts/verify-release.mjs"
+    "test": "npm run build && node --test ./tests/*.test.ts",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "verify:release": "npm run build && node --test ./tests/*.test.ts && node ./build/bin/github-pages-template.js build --config ./site/pages.config.json --out ./dist && node ./scripts/verify-package.ts && node ./scripts/verify-packed-consumer.ts && node ./scripts/verify-release.ts"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.6",
+    "typescript": "7.0.2"
   },
   "engines": {
     "node": ">=24"

@@ -4,13 +4,49 @@ export const COLOR_SCHEME_SETTING_ID = "appearance.color_scheme";
 export const CONTRAST_SETTING_ID = "appearance.contrast";
 export const LOCALE_SETTING_ID = "localization.locale";
 
-export const COLOR_SCHEME_VALUES = Object.freeze(["system", "light", "dark"]);
-export const CONTRAST_VALUES = Object.freeze(["system", "normal", "high", "low"]);
+export const COLOR_SCHEME_VALUES = Object.freeze(["system", "light", "dark"] as const);
+export const CONTRAST_VALUES = Object.freeze(["system", "normal", "high", "low"] as const);
+
+export type ColorScheme = (typeof COLOR_SCHEME_VALUES)[number];
+export type Contrast = (typeof CONTRAST_VALUES)[number];
+export type PreferenceId =
+  | typeof COLOR_SCHEME_SETTING_ID
+  | typeof CONTRAST_SETTING_ID
+  | typeof LOCALE_SETTING_ID;
+export type PreferenceValues = {
+  [COLOR_SCHEME_SETTING_ID]: ColorScheme;
+  [CONTRAST_SETTING_ID]: Contrast;
+  [LOCALE_SETTING_ID]: string;
+};
+export type PreferenceOverrides = Partial<PreferenceValues>;
+export type SitePreferencesConfig = {
+  preferences?: {
+    defaults?: Record<string, unknown>;
+    locales?: ReadonlyArray<{ id: string; label: string }>;
+    messages?: Record<string, Record<string, string>>;
+  };
+};
+
+type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+type PreferenceController = {
+  current(): PreferenceValues;
+  reset(): void;
+  dispose(): void;
+};
+type InstallOptions = {
+  window?: Window;
+  document?: Document;
+  onChange?: (change: {
+    reason: string;
+    effective: PreferenceValues;
+    overrides: PreferenceOverrides;
+  }) => void;
+};
 
 const DEFAULT_LOCALES = Object.freeze([{ id: "en", label: "English" }]);
 const COLOR_SCHEME_MEDIA_QUERY = "(prefers-color-scheme: dark)";
 
-export function configuredLocales(config) {
+export function configuredLocales(config: SitePreferencesConfig) {
   const configured = config?.preferences?.locales;
   if (!Array.isArray(configured) || configured.length === 0) {
     return DEFAULT_LOCALES.map((locale) => ({ ...locale }));
@@ -18,20 +54,23 @@ export function configuredLocales(config) {
   return configured.map((locale) => ({ id: String(locale.id), label: String(locale.label) }));
 }
 
-export function preferenceDefaults(config) {
+export function preferenceDefaults(config: SitePreferencesConfig): PreferenceValues {
   const configured = config?.preferences?.defaults ?? {};
   const locales = configuredLocales(config);
   const localeIds = new Set(locales.map((locale) => locale.id));
 
-  const colorScheme = COLOR_SCHEME_VALUES.includes(configured[COLOR_SCHEME_SETTING_ID])
-    ? configured[COLOR_SCHEME_SETTING_ID]
+  const configuredColorScheme = configured[COLOR_SCHEME_SETTING_ID];
+  const colorScheme = COLOR_SCHEME_VALUES.includes(configuredColorScheme as ColorScheme)
+    ? (configuredColorScheme as ColorScheme)
     : "system";
-  const contrast = CONTRAST_VALUES.includes(configured[CONTRAST_SETTING_ID])
-    ? configured[CONTRAST_SETTING_ID]
+  const configuredContrast = configured[CONTRAST_SETTING_ID];
+  const contrast = CONTRAST_VALUES.includes(configuredContrast as Contrast)
+    ? (configuredContrast as Contrast)
     : "system";
-  const locale = localeIds.has(configured[LOCALE_SETTING_ID])
-    ? configured[LOCALE_SETTING_ID]
-    : locales[0].id;
+  const configuredLocale = configured[LOCALE_SETTING_ID];
+  const locale = typeof configuredLocale === "string" && localeIds.has(configuredLocale)
+    ? configuredLocale
+    : (locales[0]?.id ?? "en");
 
   return {
     [COLOR_SCHEME_SETTING_ID]: colorScheme,
@@ -40,53 +79,63 @@ export function preferenceDefaults(config) {
   };
 }
 
-export function normalizePreferenceOverrides(config, candidate) {
+export function normalizePreferenceOverrides(
+  config: SitePreferencesConfig,
+  candidate: unknown,
+): PreferenceOverrides {
   if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return {};
 
   const defaults = preferenceDefaults(config);
   const locales = new Set(configuredLocales(config).map((locale) => locale.id));
-  const normalized = {};
+  const normalized: PreferenceOverrides = {};
+  const values = candidate as Record<string, unknown>;
 
   copyOverride(
     normalized,
-    candidate,
+    values,
     defaults,
     COLOR_SCHEME_SETTING_ID,
-    (value) => COLOR_SCHEME_VALUES.includes(value),
+    (value): value is ColorScheme => COLOR_SCHEME_VALUES.includes(value as ColorScheme),
   );
   copyOverride(
     normalized,
-    candidate,
+    values,
     defaults,
     CONTRAST_SETTING_ID,
-    (value) => CONTRAST_VALUES.includes(value),
+    (value): value is Contrast => CONTRAST_VALUES.includes(value as Contrast),
   );
   copyOverride(
     normalized,
-    candidate,
+    values,
     defaults,
     LOCALE_SETTING_ID,
-    (value) => locales.has(value),
+    (value): value is string => typeof value === "string" && locales.has(value),
   );
 
   return normalized;
 }
 
-export function effectivePreferences(config, overrides) {
+export function effectivePreferences(
+  config: SitePreferencesConfig,
+  overrides: unknown,
+): PreferenceValues {
   return {
     ...preferenceDefaults(config),
     ...normalizePreferenceOverrides(config, overrides),
   };
 }
 
-export function isRtlLocale(locale) {
+export function isRtlLocale(locale: unknown): boolean {
   const language = String(locale ?? "")
     .toLowerCase()
     .split(/[-_]/, 1)[0];
-  return new Set(["ar", "fa", "he", "ur"]).has(language);
+  return new Set(["ar", "fa", "he", "ur"]).has(language ?? "");
 }
 
-export function applyDocumentPreferences(document, preferences) {
+export function applyDocumentPreferences(
+  document: Document | null | undefined,
+  preferences: PreferenceValues,
+): void {
   const root = document?.documentElement;
   if (!root) return;
 
@@ -103,7 +152,10 @@ export function applyDocumentPreferences(document, preferences) {
   root.dir = isRtlLocale(locale) ? "rtl" : "ltr";
 }
 
-export function readPreferenceOverrides(storage, config) {
+export function readPreferenceOverrides(
+  storage: StorageLike | null,
+  config: SitePreferencesConfig,
+): PreferenceOverrides {
   if (!storage) return {};
   try {
     const raw = storage.getItem(PREFERENCE_STORAGE_KEY);
@@ -113,7 +165,11 @@ export function readPreferenceOverrides(storage, config) {
   }
 }
 
-export function writePreferenceOverrides(storage, config, candidate) {
+export function writePreferenceOverrides(
+  storage: StorageLike | null,
+  config: SitePreferencesConfig,
+  candidate: unknown,
+): PreferenceOverrides {
   if (!storage) return {};
   const normalized = normalizePreferenceOverrides(config, candidate);
   try {
@@ -125,7 +181,10 @@ export function writePreferenceOverrides(storage, config, candidate) {
   return normalized;
 }
 
-export function installSitePreferences(config, options = {}) {
+export function installSitePreferences(
+  config: SitePreferencesConfig,
+  options: InstallOptions = {},
+): PreferenceController {
   const windowObject = options.window ?? globalThis.window;
   const documentObject = options.document ?? globalThis.document;
   const storage = safeStorage(windowObject);
@@ -133,35 +192,37 @@ export function installSitePreferences(config, options = {}) {
   let overrides = readPreferenceOverrides(storage, config);
   let effective = effectivePreferences(config, overrides);
 
-  function apply(reason = "initial") {
+  function apply(reason = "initial"): void {
     effective = effectivePreferences(config, overrides);
     applyDocumentPreferences(documentObject, effective);
     syncControls(documentObject, effective, colorSchemeMedia);
     options.onChange?.({ reason, effective: { ...effective }, overrides: { ...overrides } });
   }
 
-  function update(id, value) {
+  function update(id: PreferenceId, value: string): void {
     overrides = normalizePreferenceOverrides(config, { ...overrides, [id]: value });
     overrides = writePreferenceOverrides(storage, config, overrides);
     apply("user");
   }
 
-  function reset() {
+  function reset(): void {
     overrides = writePreferenceOverrides(storage, config, {});
     apply("reset");
   }
 
-  const onInput = (event) => {
+  const onInput = (event: Event) => {
     const target = event.target;
-    if (!target || target.tagName !== "SELECT") return;
-    const id = target.dataset?.preferenceId;
+    if (!(target instanceof HTMLSelectElement)) return;
+    const id = target.dataset.preferenceId as PreferenceId | undefined;
     if (!id) return;
     update(id, target.value);
   };
   documentObject?.addEventListener?.("change", onInput);
 
-  const onClick = (event) => {
-    const target = event.target?.closest?.("[data-preference-action]");
+  const onClick = (event: Event) => {
+    const target = event.target instanceof Element
+      ? event.target.closest<HTMLElement>("[data-preference-action]")
+      : null;
     if (target?.dataset?.preferenceAction !== "toggle-color-scheme") return;
     const current = resolvedColorScheme(effective, colorSchemeMedia);
     update(COLOR_SCHEME_SETTING_ID, current === "dark" ? "light" : "dark");
@@ -171,7 +232,7 @@ export function installSitePreferences(config, options = {}) {
   const resetButton = documentObject?.querySelector("#site-preferences-reset");
   resetButton?.addEventListener("click", reset);
 
-  const onStorage = (event) => {
+  const onStorage = (event: StorageEvent) => {
     if (event.key !== PREFERENCE_STORAGE_KEY) return;
     overrides = readPreferenceOverrides(storage, config);
     apply("storage");
@@ -201,26 +262,39 @@ export function installSitePreferences(config, options = {}) {
   };
 }
 
-function copyOverride(target, candidate, defaults, id, validate) {
+function copyOverride<T extends string>(
+  target: PreferenceOverrides,
+  candidate: Record<string, unknown>,
+  defaults: PreferenceValues,
+  id: PreferenceId,
+  validate: (value: unknown) => value is T,
+): void {
   const value = candidate[id];
   if (!validate(value) || value === defaults[id]) return;
-  target[id] = value;
+  (target as Record<string, unknown>)[id] = value;
 }
 
-function resolvedColorScheme(effective, colorSchemeMedia) {
+function resolvedColorScheme(
+  effective: PreferenceValues,
+  colorSchemeMedia: MediaQueryList | null,
+): "light" | "dark" {
   const configured = effective?.[COLOR_SCHEME_SETTING_ID];
   if (configured === "light" || configured === "dark") return configured;
   return colorSchemeMedia?.matches ? "dark" : "light";
 }
 
-function syncControls(documentObject, effective, colorSchemeMedia) {
-  for (const control of documentObject?.querySelectorAll?.("[data-preference-id]") ?? []) {
+function syncControls(
+  documentObject: Document | undefined,
+  effective: PreferenceValues,
+  colorSchemeMedia: MediaQueryList | null,
+): void {
+  for (const control of documentObject?.querySelectorAll<HTMLSelectElement>("[data-preference-id]") ?? []) {
     const id = control.dataset.preferenceId;
-    if (id && id in effective) control.value = effective[id];
+    if (id && id in effective) control.value = effective[id as PreferenceId];
   }
 
   const colorScheme = resolvedColorScheme(effective, colorSchemeMedia);
-  for (const toggle of documentObject?.querySelectorAll?.(
+  for (const toggle of documentObject?.querySelectorAll<HTMLElement>(
     '[data-preference-action="toggle-color-scheme"]',
   ) ?? []) {
     toggle.dataset.themeState = colorScheme;
@@ -228,7 +302,7 @@ function syncControls(documentObject, effective, colorSchemeMedia) {
   }
 }
 
-function safeStorage(windowObject) {
+function safeStorage(windowObject: Window | undefined): StorageLike | null {
   try {
     return windowObject?.localStorage ?? null;
   } catch {
