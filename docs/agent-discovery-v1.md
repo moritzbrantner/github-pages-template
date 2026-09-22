@@ -39,11 +39,11 @@ Consuming repositories can append project-specific routes with `agent.routes`:
 - `kind`: optional route category; defaults to `page`.
 - `mediaType`: optional response media type; defaults to `text/html`.
 
-Route IDs must be unique within the configured project routes. IDs are identifiers, not presentation copy, and should remain stable when labels change.
+Route IDs must be unique across the complete manifest. The built-in IDs `overview`, `stats`, `evidence`, and `preferences` are reserved. IDs are identifiers, not presentation copy, and should remain stable when labels change.
 
 ## Resources and provenance
 
-The manifest includes `project-pages.json` and projects configured `evidenceSources` into the resource list. Evidence source IDs, kinds, URLs, and explicit producers are retained rather than normalized into new meanings.
+The manifest includes `project-pages.json` and projects configured `evidenceSources` into the resource list. Evidence resources use an `evidence:<source-id>` manifest ID while retaining the original source ID separately, together with its kind, URL, and explicit producer.
 
 The template does not:
 
