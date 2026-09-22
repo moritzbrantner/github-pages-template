@@ -151,7 +151,7 @@ function validateAgentConfig(config) {
     if (!Array.isArray(agent.routes)) {
       fail("agent.routes must be an array when configured.");
     }
-    const ids = new Set();
+    const ids = new Set(["overview", "stats", "evidence", "preferences"]);
     for (const route of agent.routes) {
       if (!route?.id || !route?.label || !route?.href) {
         fail("Each agent route requires id, label, and href.");
@@ -419,7 +419,8 @@ function renderAgentManifest(config, mode) {
       mediaType: "application/json",
     },
     ...(config.evidenceSources ?? []).map((source) => ({
-      id: source.id,
+      id: `evidence:${source.id}`,
+      sourceId: source.id,
       label: source.label,
       href: source.url,
       kind: source.kind,
