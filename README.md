@@ -7,6 +7,7 @@ The repository provides a zero-dependency static generator that creates standard
 - current stats from explicit evidence producers;
 - mechanically justified accomplishments;
 - evidence provenance, freshness, and exact revision;
+- a root `agent.json` discovery manifest for software agents;
 - stable `/stats/` and `/evidence/` routes;
 - a common accessible/responsive visual shell;
 - shared light/dark/system theme and contrast preferences;
@@ -51,7 +52,7 @@ vite build
 github-pages-template build --config ./pages.config.json --out ./dist --augment
 ```
 
-`--augment` preserves the project's existing `dist/index.html` and adds the shared assets plus `/stats/`, `/evidence/`, and `project-pages.json`.
+`--augment` preserves the project's existing `dist/index.html` and adds the shared assets plus `/stats/`, `/evidence/`, `project-pages.json`, and `agent.json`.
 
 Augment builds record their owned paths in `project-pages.json`. A later augment build removes only those recorded paths before regenerating them, so removed copy entries do not leave stale files while the consumer's homepage and unrelated assets remain untouched. Configured copy destinations must stay inside the selected output directory, and an existing consumer-owned target is rejected instead of overwritten.
 
@@ -84,6 +85,16 @@ See [`docs/consumer-adoption.md`](docs/consumer-adoption.md) for the full consum
   "links": [
     { "label": "Demo", "href": "/maps/" }
   ],
+  "agent": {
+    "routes": [
+      {
+        "id": "demo",
+        "label": "Interactive demo",
+        "href": "/maps/",
+        "description": "Project-owned interactive map demo."
+      }
+    ]
+  },
   "evidenceSources": [
     {
       "id": "coding-tooling",
@@ -102,6 +113,14 @@ See [`docs/consumer-adoption.md`](docs/consumer-adoption.md) for the full consum
 ```
 
 See [`docs/project-evidence-v1.md`](docs/project-evidence-v1.md) for the producer-neutral evidence contract.
+
+## Agent discovery
+
+Every generated site publishes `agent.json` at the project root and advertises it from generated HTML with a machine-readable alternate link. The manifest is static, requires no JavaScript to discover, and identifies the repository, base path, standard template routes, configured project routes, the project-pages manifest, and configured evidence sources.
+
+Consumers can add repository-specific routes under `agent.routes`. Route identifiers are stable machine-facing keys; labels and descriptions explain their purpose, while the consuming repository remains authoritative for the route's domain semantics. The template does not infer actions, benchmark meaning, or quality judgments from the UI.
+
+See [`docs/agent-discovery-v1.md`](docs/agent-discovery-v1.md) for the contract.
 
 ## Preferences, localization, and accessibility
 

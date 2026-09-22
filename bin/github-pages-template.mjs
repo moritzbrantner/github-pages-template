@@ -28,6 +28,7 @@ const coreManagedPaths = [
   "evidence/index.html",
   "preferences/index.html",
   "project-pages.json",
+  "agent.json",
 ];
 const reservedCopyPaths = new Set([...coreManagedPaths, "index.html"]);
 
@@ -100,6 +101,10 @@ await writeFile(
     2,
   )}\n`,
 );
+await writeFile(
+  resolve(outDir, "agent.json"),
+  `${JSON.stringify(renderAgentManifest(config, args.augment ? "augment" : "full"), null, 2)}\n`,
+);
 
 function parseArgs(values) {
   const result = { augment: false };
@@ -131,7 +136,35 @@ function validateConfig(config) {
       fail("Each evidence source requires id, label, kind, and url.");
     }
   }
+  validateAgentConfig(config);
   validatePreferences(config);
+}
+
+function validateAgentConfig(config) {
+  const agent = config.agent;
+  if (agent == null) return;
+  if (typeof agent !== "object" || Array.isArray(agent)) {
+    fail("agent must be an object.");
+  }
+
+  if (agent.routes != null) {
+    if (!Array.isArray(agent.routes)) {
+      fail("agent.routes must be an array when configured.");
+    }
+    const ids = new Set(["overview", "stats", "evidence", "preferences"]);
+    for (const route of agent.routes) {
+      if (!route?.id || !route?.label || !route?.href) {
+        fail("Each agent route requires id, label, and href.");
+      }
+      if (ids.has(route.id)) fail(`agent route '${route.id}' is duplicated.`);
+      ids.add(route.id);
+      for (const field of ["id", "label", "href", "description", "kind", "mediaType"]) {
+        if (route[field] != null && typeof route[field] !== "string") {
+          fail(`agent.routes.${route.id}.${field} must be a string.`);
+        }
+      }
+    }
+  }
 }
 
 function validatePreferences(config) {
@@ -332,6 +365,93 @@ async function pathExists(path) {
   }
 }
 
+function renderAgentManifest(config, mode) {
+  const project = config.project;
+  const routes = [
+    {
+      id: "overview",
+      label: "Overview",
+      href: project.basePath,
+      kind: "page",
+      mediaType: "text/html",
+      description: "Human-readable project overview.",
+    },
+    {
+      id: "stats",
+      label: "Stats",
+      href: `${project.basePath}stats/`,
+      kind: "page",
+      mediaType: "text/html",
+      description: "Current measurements from configured evidence producers.",
+    },
+    {
+      id: "evidence",
+      label: "Evidence",
+      href: `${project.basePath}evidence/`,
+      kind: "page",
+      mediaType: "text/html",
+      description: "Evidence provenance, freshness, revisions, and diagnostics.",
+    },
+    {
+      id: "preferences",
+      label: "Preferences",
+      href: `${project.basePath}preferences/`,
+      kind: "page",
+      mediaType: "text/html",
+      description: "Pages presentation preferences.",
+    },
+    ...(config.agent?.routes ?? []).map((route) => ({
+      id: route.id,
+      label: route.label,
+      href: route.href,
+      kind: route.kind ?? "page",
+      mediaType: route.mediaType ?? "text/html",
+      ...(route.description ? { description: route.description } : {}),
+    })),
+  ];
+
+  const resources = [
+    {
+      id: "project-pages",
+      label: "Project Pages manifest",
+      href: `${project.basePath}project-pages.json`,
+      kind: "manifest",
+      mediaType: "application/json",
+    },
+    ...(config.evidenceSources ?? []).map((source) => ({
+      id: `evidence:${source.id}`,
+      sourceId: source.id,
+      label: source.label,
+      href: source.url,
+      kind: source.kind,
+      mediaType: "application/json",
+      ...(source.producer ? { producer: source.producer } : {}),
+    })),
+  ];
+
+  return {
+    schemaVersion: 1,
+    kind: "github-pages-agent-discovery",
+    generatedBy: managedBy,
+    generatedFrom: project.repository,
+    mode,
+    project: {
+      name: project.name,
+      repository: project.repository,
+      basePath: project.basePath,
+      ...(project.description ? { description: project.description } : {}),
+    },
+    discovery: {
+      self: `${project.basePath}agent.json`,
+      projectPages: `${project.basePath}project-pages.json`,
+      sourceRepository: `https://github.com/${project.repository}`,
+      javascriptRequired: false,
+    },
+    routes,
+    resources,
+  };
+}
+
 function renderPage(config, page) {
   const project = config.project;
   const defaults = preferenceDefaults(config);
@@ -361,6 +481,7 @@ function renderPage(config, page) {
     <meta name="color-scheme" content="light dark" />
     <title>${escapeHtml(title)}</title>
     <meta name="description" content="${escapeHtml(project.description ?? "Project evidence and documentation")}" />
+    <link rel="alternate" type="application/json" href="${project.basePath}agent.json" title="Agent discovery manifest" />
     <script>${renderPreferenceBootstrap(config)}</script>
     <link rel="stylesheet" href="${project.basePath}assets/site.css" />
   </head>

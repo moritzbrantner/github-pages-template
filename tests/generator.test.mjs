@@ -18,6 +18,16 @@ function config() {
       basePath: "/fixture/",
       description: "Fixture project",
     },
+    agent: {
+      routes: [
+        {
+          id: "demo",
+          label: "Interactive demo",
+          href: "/fixture/demo/",
+          description: "Project-owned interactive demonstration.",
+        },
+      ],
+    },
     evidenceSources: [
       {
         id: "verification",
@@ -29,7 +39,7 @@ function config() {
   };
 }
 
-test("build creates overview, stats, evidence, and machine-readable manifest", async () => {
+test("build creates human pages plus project and agent discovery manifests", async () => {
   const root = await mkdtemp(join(tmpdir(), "pages-template-"));
   const configPath = join(root, "pages.config.json");
   const out = join(root, "dist");
@@ -41,8 +51,10 @@ test("build creates overview, stats, evidence, and machine-readable manifest", a
   const stats = await readFile(join(out, "stats/index.html"), "utf8");
   const evidence = await readFile(join(out, "evidence/index.html"), "utf8");
   const manifest = JSON.parse(await readFile(join(out, "project-pages.json"), "utf8"));
+  const agent = JSON.parse(await readFile(join(out, "agent.json"), "utf8"));
 
   assert.match(overview, /Measured project evidence/);
+  assert.match(overview, /rel="alternate" type="application\/json" href="\/fixture\/agent\.json"/);
   assert.match(stats, /Current measurements/);
   assert.match(evidence, /Each source retains its producer/);
   assert.equal(manifest.schemaVersion, 1);
@@ -51,6 +63,23 @@ test("build creates overview, stats, evidence, and machine-readable manifest", a
   assert.equal(manifest.generatedFrom, "example/fixture");
   assert.ok(manifest.managedPaths.includes("index.html"));
   assert.ok(manifest.managedPaths.includes("stats/index.html"));
+  assert.ok(manifest.managedPaths.includes("agent.json"));
+  assert.equal(agent.schemaVersion, 1);
+  assert.equal(agent.kind, "github-pages-agent-discovery");
+  assert.equal(agent.generatedFrom, "example/fixture");
+  assert.equal(agent.discovery.self, "/fixture/agent.json");
+  assert.equal(agent.discovery.javascriptRequired, false);
+  assert.ok(agent.routes.some((route) => route.id === "overview" && route.href === "/fixture/"));
+  assert.ok(agent.routes.some((route) => route.id === "demo" && route.href === "/fixture/demo/"));
+  assert.ok(
+    agent.resources.some(
+      (resource) =>
+        resource.id === "evidence:verification" &&
+        resource.sourceId === "verification" &&
+        resource.href === "/fixture/evidence/project.json" &&
+        resource.kind === "project-evidence-v1",
+    ),
+  );
 });
 
 test("augment mode preserves an existing project index", async () => {
@@ -118,6 +147,27 @@ test("augment mode removes stale template-owned copies without touching consumer
   assert.equal(manifest.mode, "augment");
   assert.ok(!manifest.managedPaths.includes("index.html"));
   assert.ok(!manifest.managedPaths.includes("evidence/runtime.json"));
+});
+
+test("agent routes require unique stable identifiers", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pages-template-agent-route-"));
+  const configPath = join(root, "pages.config.json");
+  const out = join(root, "dist");
+  const invalidConfig = config();
+  invalidConfig.agent.routes.push({
+    id: "demo",
+    label: "Duplicate demo",
+    href: "/fixture/other-demo/",
+  });
+  await writeFile(configPath, `${JSON.stringify(invalidConfig, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(process.execPath, [cli, "build", "--config", configPath, "--out", out]),
+    (error) => {
+      assert.match(error.stderr, /agent route 'demo' is duplicated/);
+      return true;
+    },
+  );
 });
 
 test("copy destinations cannot escape the output directory", async () => {
