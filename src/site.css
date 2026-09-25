@@ -131,7 +131,7 @@ body {
 }
 
 a {
-  color: var(--accent);
+  color: var(--primary);
   text-underline-offset: 0.18em;
 }
 
@@ -542,8 +542,10 @@ td[data-state="failed"] {
 .preferences-page {
   max-width: 42rem;
   margin-top: 0;
-  padding-top: 0;
-  border-top: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .preferences-page__form {
