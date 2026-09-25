@@ -38,5 +38,12 @@
       "producer": "coding-tooling",
       "url": "https://moritzbrantner.github.io/coding-tooling/analysis.json/?repo=moritzbrantner/github-pages-template"
     }
+  ],
+  "relatedRepositories": [
+    "moritzbrantner/2d-lab",
+    "moritzbrantner/compiler-lab",
+    "moritzbrantner/example-apps",
+    "moritzbrantner/maps",
+    "moritzbrantner/runtime-profiler"
   ]
 }
