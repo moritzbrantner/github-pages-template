@@ -56,7 +56,8 @@ test("build creates human pages plus project and agent discovery manifests", asy
   assert.match(overview, /Measured project evidence/);
   assert.match(overview, /rel="alternate" type="application\/json" href="\/fixture\/agent\.json"/);
   assert.match(stats, /Current measurements/);
-  assert.match(evidence, /Each source retains its producer/);
+  assert.match(evidence, /Evidence revision/);
+  assert.doesNotMatch(evidence, /Each source retains its producer/);
   assert.equal(manifest.schemaVersion, 1);
   assert.equal(manifest.managedBy, "@moritzbrantner/github-pages-template");
   assert.equal(manifest.mode, "full");
