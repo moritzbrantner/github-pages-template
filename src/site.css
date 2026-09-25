@@ -496,7 +496,6 @@ td[data-state="failed"] {
   .site-navigation {
     display: block;
     position: relative;
-    order: 2;
   }
 
   .site-menu-toggle {
@@ -549,7 +548,6 @@ td[data-state="failed"] {
 
   .site-quick-preferences {
     width: auto;
-    order: 1;
     flex-wrap: nowrap;
   }
 
