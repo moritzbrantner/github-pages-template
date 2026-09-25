@@ -65,7 +65,10 @@ test("generated pages expose compact mobile navigation and icon-first preference
   assert.doesNotMatch(overview, /data-i18n="overview\.evidenceBody"/);
   assert.doesNotMatch(overview, /data-i18n="footer\.evidence"/);
   assert.doesNotMatch(overview, /class="site-footer"/);
-  assert.match(overview, />Gemessene Projektnachweise</);
+  assert.match(overview, /<h1 id="overview-title" class="visually-hidden">Fixture<\/h1>/);
+  assert.match(overview, />Statistiken<\/a>/);
+  assert.match(overview, />Nachweise<\/a>/);
+  assert.doesNotMatch(overview, />Gemessene Projektnachweise</);
 
   assert.doesNotMatch(stats, /data-i18n="stats\.intro"/);
   assert.doesNotMatch(stats, /data-i18n="stats\.eyebrow"/);
