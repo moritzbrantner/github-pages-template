@@ -518,9 +518,6 @@ function renderPage(config: any, page: string): string {
     <main id="main" class="site-main">
       ${body}
     </main>
-    <footer class="site-footer">
-<a href="https://github.com/${escapeHtml(project.repository)}" data-i18n="footer.repository">${t("footer.repository")}</a>
-    </footer>
     <script>window.__PROJECT_PAGES_CONFIG__ = ${configJson};</script>
     <script type="module" src="${project.basePath}assets/site-runtime.js"></script>
   </body>
