@@ -28,6 +28,7 @@ function config() {
         },
       ],
     },
+    relatedRepositories: ["example/alpha", "example/beta"],
     evidenceSources: [
       {
         id: "verification",
@@ -53,7 +54,14 @@ test("build creates human pages plus project and agent discovery manifests", asy
   const manifest = JSON.parse(await readFile(join(out, "project-pages.json"), "utf8"));
   const agent = JSON.parse(await readFile(join(out, "agent.json"), "utf8"));
 
-  assert.match(overview, /Measured project evidence/);
+  assert.doesNotMatch(overview, /Measured project evidence/);
+  assert.match(overview, /class="overview-links"/);
+  assert.match(overview, />Stats<\/a>/);
+  assert.match(overview, />Evidence<\/a>/);
+  assert.match(overview, /data-i18n="overview\.repositories">Used by<\/h2>/);
+  assert.match(overview, /href="https:\/\/github\.com\/example\/alpha"/);
+  assert.match(overview, />alpha<\/span>/);
+  assert.match(overview, /href="https:\/\/github\.com\/example\/beta"/);
   assert.match(overview, /rel="alternate" type="application\/json" href="\/fixture\/agent\.json"/);
   assert.match(stats, /Current measurements/);
   assert.match(evidence, /Evidence revision/);
@@ -79,6 +87,14 @@ test("build creates human pages plus project and agent discovery manifests", asy
         resource.sourceId === "verification" &&
         resource.href === "/fixture/evidence/project.json" &&
         resource.kind === "project-evidence-v1",
+    ),
+  );
+  assert.ok(
+    agent.resources.some(
+      (resource) =>
+        resource.id === "repository:example/alpha" &&
+        resource.href === "https://github.com/example/alpha" &&
+        resource.kind === "repository",
     ),
   );
 });
@@ -148,6 +164,24 @@ test("augment mode removes stale template-owned copies without touching consumer
   assert.equal(manifest.mode, "augment");
   assert.ok(!manifest.managedPaths.includes("index.html"));
   assert.ok(!manifest.managedPaths.includes("evidence/runtime.json"));
+});
+
+test("related repositories require unique owner/repository identifiers", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pages-template-related-repositories-"));
+  const configPath = join(root, "pages.config.json");
+  const out = join(root, "dist");
+  const invalidConfig = config();
+  invalidConfig.relatedRepositories = ["example/alpha", "not-a-repository"];
+
+  await writeFile(configPath, `${JSON.stringify(invalidConfig, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(process.execPath, [cli, "build", "--config", configPath, "--out", out]),
+    (error) => {
+      assert.match(error.stderr, /relatedRepositories entry must be an owner\/repository string/);
+      return true;
+    },
+  );
 });
 
 test("agent routes require unique stable identifiers", async () => {
