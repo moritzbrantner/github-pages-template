@@ -64,6 +64,7 @@ test("generated pages expose compact mobile navigation and icon-first preference
   assert.doesNotMatch(overview, /class="lede"/);
   assert.doesNotMatch(overview, /data-i18n="overview\.evidenceBody"/);
   assert.doesNotMatch(overview, /data-i18n="footer\.evidence"/);
+  assert.doesNotMatch(overview, /class="site-footer"/);
   assert.match(overview, />Gemessene Projektnachweise</);
 
   assert.doesNotMatch(stats, /data-i18n="stats\.intro"/);
