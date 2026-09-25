@@ -135,8 +135,7 @@ select {
 }
 
 .site-header__inner,
-.site-main,
-.site-footer {
+.site-main {
   width: min(calc(100% - 2rem), var(--content));
   margin-inline: auto;
 }
@@ -351,16 +350,6 @@ td[data-state="failed"] {
 .accomplishment-list p {
   margin: 0.35rem 0;
   max-width: 54rem;
-}
-
-.site-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 1rem;
-  padding-block: 1.5rem 2rem;
-  border-top: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 0.85rem;
 }
 
 .site-quick-preferences {
