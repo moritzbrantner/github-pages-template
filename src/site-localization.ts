@@ -4,6 +4,7 @@ const BUILTIN_MESSAGES: Readonly<Record<string, Readonly<Record<string, string>>
   en: Object.freeze({
     "skip.content": "Skip to content",
     "nav.project": "Project",
+    "nav.menu": "Menu",
     "nav.overview": "Overview",
     "nav.stats": "Stats",
     "nav.evidence": "Evidence",
@@ -74,6 +75,7 @@ const BUILTIN_MESSAGES: Readonly<Record<string, Readonly<Record<string, string>>
   de: Object.freeze({
     "skip.content": "Zum Inhalt springen",
     "nav.project": "Projekt",
+    "nav.menu": "Menü",
     "nav.overview": "Übersicht",
     "nav.stats": "Statistiken",
     "nav.evidence": "Nachweise",
