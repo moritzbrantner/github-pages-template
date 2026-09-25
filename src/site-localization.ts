@@ -4,6 +4,7 @@ const BUILTIN_MESSAGES: Readonly<Record<string, Readonly<Record<string, string>>
   en: Object.freeze({
     "skip.content": "Skip to content",
     "nav.project": "Project",
+    "nav.menu": "Menu",
     "nav.overview": "Overview",
     "nav.stats": "Stats",
     "nav.evidence": "Evidence",
@@ -20,8 +21,6 @@ const BUILTIN_MESSAGES: Readonly<Record<string, Readonly<Record<string, string>>
     "preferences.contrast.low": "Low",
     "preferences.language": "Language",
     "preferences.reset": "Use project defaults",
-    "footer.evidence": "Evidence is observational and revision-bound; missing or malformed evidence is never treated as success.",
-    "footer.repository": "Repository",
     "overview.evidenceTitle": "Measured project evidence",
     "overview.evidenceBody": "Stats and accomplishments are rendered from explicit evidence producers. The template does not reinterpret benchmark semantics or manufacture a synthetic quality score.",
     "overview.viewStats": "View stats",
@@ -74,6 +73,7 @@ const BUILTIN_MESSAGES: Readonly<Record<string, Readonly<Record<string, string>>
   de: Object.freeze({
     "skip.content": "Zum Inhalt springen",
     "nav.project": "Projekt",
+    "nav.menu": "Menü",
     "nav.overview": "Übersicht",
     "nav.stats": "Statistiken",
     "nav.evidence": "Nachweise",
@@ -90,8 +90,6 @@ const BUILTIN_MESSAGES: Readonly<Record<string, Readonly<Record<string, string>>
     "preferences.contrast.low": "Niedrig",
     "preferences.language": "Sprache",
     "preferences.reset": "Projektstandard verwenden",
-    "footer.evidence": "Nachweise sind beobachtungs- und revisionsgebunden; fehlende oder fehlerhafte Nachweise gelten nie als Erfolg.",
-    "footer.repository": "Repository",
     "overview.evidenceTitle": "Gemessene Projektnachweise",
     "overview.evidenceBody": "Statistiken und erreichte Ergebnisse werden aus expliziten Nachweisquellen dargestellt. Die Vorlage interpretiert Benchmark-Semantik nicht neu und erzeugt keinen synthetischen Qualitätsscore.",
     "overview.viewStats": "Statistiken ansehen",

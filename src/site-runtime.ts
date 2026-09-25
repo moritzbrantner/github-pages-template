@@ -44,6 +44,7 @@ if (config) {
   preferenceController = installSitePreferences(config, {
     onChange({ effective }) {
       applyPageLocalization(effective[LOCALE_SETTING_ID]);
+      syncLanguageFlag(effective[LOCALE_SETTING_ID]);
       if (renderedResults.length > 0) rerenderEvidence();
     },
   });
@@ -74,6 +75,16 @@ function applyPageLocalization(locale: string): void {
           ? translate(config, locale, "preferences.summary")
           : null;
   document.title = pageLabel ? `${pageLabel} · ${config.project.name}` : config.project.name;
+}
+
+function syncLanguageFlag(locale: string): void {
+  const select = document.querySelector<HTMLSelectElement>(
+    '.quick-control--language select[data-preference-id="localization.locale"]',
+  );
+  const flag = document.querySelector<HTMLElement>("[data-language-flag]");
+  if (!select || !flag) return;
+  const option = [...select.options].find((candidate) => candidate.value === locale);
+  flag.textContent = option?.dataset.flag ?? "🌐";
 }
 
 async function loadEvidence(): Promise<void> {

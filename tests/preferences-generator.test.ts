@@ -33,7 +33,7 @@ function config() {
   };
 }
 
-test("generated pages keep theme and language visible and expose a preferences route", async () => {
+test("generated pages expose compact mobile navigation and icon-first preferences", async () => {
   const root = await mkdtemp(join(tmpdir(), "pages-template-preferences-"));
   const configPath = join(root, "pages.config.json");
   const out = join(root, "dist");
@@ -42,22 +42,47 @@ test("generated pages keep theme and language visible and expose a preferences r
   await execFileAsync(process.execPath, [cli, "build", "--config", configPath, "--out", out]);
 
   const overview = await readFile(join(out, "index.html"), "utf8");
+  const stats = await readFile(join(out, "stats", "index.html"), "utf8");
+  const evidence = await readFile(join(out, "evidence", "index.html"), "utf8");
   const preferences = await readFile(join(out, "preferences", "index.html"), "utf8");
+  const stylesheet = await readFile(join(out, "assets", "site.css"), "utf8");
   const manifest = JSON.parse(await readFile(join(out, "project-pages.json"), "utf8"));
 
   assert.match(overview, /<html lang="de" dir="ltr">/);
+  assert.match(overview, /<details class="site-navigation">/);
+  assert.match(overview, /class="site-menu-toggle"/);
+  assert.match(overview, /data-i18n="nav\.menu"/);
   assert.match(overview, /data-preference-action="toggle-color-scheme"/);
+  assert.match(overview, /class="theme-toggle__track"/);
   assert.match(overview, /class="quick-control quick-control--language"/);
+  assert.match(overview, /data-language-flag/);
+  assert.match(overview, /data-flag="🇩🇪"/);
   assert.match(overview, /data-preference-id="localization\.locale"/);
   assert.match(overview, /href="\/fixture\/preferences\/"/);
-  assert.doesNotMatch(overview, /<details class="site-preferences">/);
+  assert.doesNotMatch(overview, /quick-control__category/);
+  assert.doesNotMatch(overview, /class="hero"/);
+  assert.doesNotMatch(overview, /class="lede"/);
+  assert.doesNotMatch(overview, /data-i18n="overview\.evidenceBody"/);
+  assert.doesNotMatch(overview, /data-i18n="footer\.evidence"/);
+  assert.doesNotMatch(overview, /class="site-footer"/);
   assert.match(overview, />Gemessene Projektnachweise</);
+
+  assert.doesNotMatch(stats, /data-i18n="stats\.intro"/);
+  assert.doesNotMatch(stats, /data-i18n="stats\.eyebrow"/);
+  assert.doesNotMatch(evidence, /data-i18n="evidence\.intro"/);
+  assert.doesNotMatch(evidence, /data-i18n="evidence\.eyebrow"/);
 
   assert.match(preferences, /data-page="preferences"/);
   assert.match(preferences, /data-preference-id="appearance\.color_scheme"/);
   assert.match(preferences, /data-preference-id="appearance\.contrast"/);
   assert.match(preferences, /data-preference-id="localization\.locale"/);
+  assert.doesNotMatch(preferences, /data-i18n="preferences\.description"/);
   assert.match(preferences, />Einstellungen</);
+
+  assert.match(stylesheet, /@media \(max-width: 42rem\)/);
+  assert.match(stylesheet, /\.site-navigation:not\(\[open\]\) > \.site-nav/);
+  assert.match(stylesheet, /\.quick-control--language select/);
+  assert.match(stylesheet, /opacity: 0/);
 
   assert.ok(manifest.managedPaths.includes("preferences/index.html"));
   assert.ok(manifest.managedPaths.includes("assets/site-preferences.js"));
