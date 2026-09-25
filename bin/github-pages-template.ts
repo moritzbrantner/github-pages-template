@@ -143,7 +143,28 @@ function validateConfig(config: any): void {
     }
   }
   validateAgentConfig(config);
+  validateRelatedRepositories(config);
   validatePreferences(config);
+}
+
+function validateRelatedRepositories(config: any): void {
+  const repositories = config.relatedRepositories;
+  if (repositories == null) return;
+  if (!Array.isArray(repositories)) {
+    fail("relatedRepositories must be an array when configured.");
+  }
+
+  const seen = new Set<string>();
+  for (const repository of repositories) {
+    if (
+      typeof repository !== "string" ||
+      !/^[^/\s]+\/[^/\s]+$/.test(repository)
+    ) {
+      fail("Each relatedRepositories entry must be an owner/repository string.");
+    }
+    if (seen.has(repository)) fail(`related repository '${repository}' is duplicated.`);
+    seen.add(repository);
+  }
 }
 
 function validateAgentConfig(config: any): void {
@@ -435,6 +456,13 @@ function renderAgentManifest(config: any, mode: "augment" | "full") {
       mediaType: "application/json",
       ...(source.producer ? { producer: source.producer } : {}),
     })),
+    ...(config.relatedRepositories ?? []).map((repository: string) => ({
+      id: `repository:${repository}`,
+      label: repository,
+      href: `https://github.com/${repository}`,
+      kind: "repository",
+      mediaType: "text/html",
+    })),
   ];
 
   return {
@@ -647,13 +675,27 @@ function preferenceOption(
 function renderOverview(config: any, locale: string): string {
   const project = config.project;
   const t = (key: string) => escapeHtml(translate(config, locale, key));
+  const repositories = config.relatedRepositories ?? [];
   return `<section class="overview-actions" aria-labelledby="overview-title">
-        <h1 id="overview-title" data-i18n="overview.evidenceTitle">${t("overview.evidenceTitle")}</h1>
-        <div class="overview-links">
-          <a href="${project.basePath}stats/" data-i18n="overview.viewStats">${t("overview.viewStats")}</a>
-          <a href="${project.basePath}evidence/" data-i18n="overview.inspectEvidence">${t("overview.inspectEvidence")}</a>
-        </div>
+        <h1 id="overview-title" class="visually-hidden">${escapeHtml(project.name)}</h1>
+        <nav class="overview-links" aria-label="${t("nav.project")}" data-i18n-aria-label="nav.project">
+          <a href="${project.basePath}stats/" data-i18n="nav.stats">${t("nav.stats")}</a>
+          <a href="${project.basePath}evidence/" data-i18n="nav.evidence">${t("nav.evidence")}</a>
+        </nav>
+        ${repositories.length > 0 ? renderRelatedRepositories(repositories, t) : ""}
       </section>`;
+}
+
+function renderRelatedRepositories(repositories: string[], t: (key: string) => string): string {
+  return `<section class="repository-index" aria-labelledby="repository-index-title">
+          <h2 id="repository-index-title" data-i18n="overview.repositories">${t("overview.repositories")}</h2>
+          <ul class="repository-list">
+            ${repositories.map((repository) => {
+              const name = repository.split("/").at(-1) ?? repository;
+              return `<li><a class="repository-link" href="https://github.com/${escapeHtml(repository)}" aria-label="${escapeHtml(repository)}"><span>${escapeHtml(name)}</span><span class="repository-link__arrow" aria-hidden="true">↗</span></a></li>`;
+            }).join("\n            ")}
+          </ul>
+        </section>`;
 }
 
 function renderEvidenceSurface(config: any, page: string, locale: string): string {
