@@ -1,13 +1,46 @@
+/* Presentation tokens follow the public @moritzbrantner/ui 1.1 design-system contract.
+ * The template stays framework-neutral: it consumes the shared token semantics without
+ * introducing React into generated GitHub Pages output.
+ */
 :root {
   color-scheme: light dark;
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   line-height: 1.5;
   --content: 74rem;
-  --border: color-mix(in srgb, currentColor 18%, transparent);
-  --muted: color-mix(in srgb, currentColor 68%, transparent);
-  --surface: color-mix(in srgb, Canvas 94%, currentColor 6%);
-  --accent: LinkText;
+  --radius: 0.75rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.18 0.012 255);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.42 0.075 255);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.955 0.012 255);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0.004 255);
+  --muted-foreground: oklch(0.5 0 0);
+  --accent: oklch(0.925 0.032 242);
+  --accent-foreground: oklch(0.205 0 0);
+  --border: oklch(0.88 0.008 255);
+  --input: oklch(0.86 0.008 255);
+  --ring: oklch(0.56 0.09 252);
+  --ui-radius-control: calc(var(--radius) - 0.125rem);
+  --ui-radius-surface: calc(var(--radius) + 0.125rem);
+  --ui-radius-overlay: calc(var(--radius) + 0.25rem);
+  --ui-radius-pill: 999px;
+  --ui-control-height-sm: 2rem;
+  --ui-control-height-md: 2.25rem;
+  --ui-control-height-lg: 2.5rem;
+  --ui-control-padding-x-sm: 0.75rem;
+  --ui-focus-ring-width: 3px;
+  --ui-shadow-surface: 0 10px 30px oklch(0.2 0.025 255 / 0.09);
+  --ui-shadow-interactive: 0 10px 24px oklch(0.22 0.035 255 / 0.12);
+  --ui-motion-duration-fast: 100ms;
+  --ui-motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --surface: var(--card);
+  --surface-muted: var(--muted);
+  --text-muted: var(--muted-foreground);
 }
 
 :root[data-color-scheme="light"] {
@@ -16,35 +49,73 @@
 
 :root[data-color-scheme="dark"] {
   color-scheme: dark;
+  --background: oklch(0.15 0.008 255);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.21 0.01 255);
+  --card-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.82 0.075 255);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.285 0.018 255);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.245 0.012 255);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.33 0.04 245);
+  --accent-foreground: oklch(0.985 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.72 0.08 252);
+  --ui-shadow-surface: 0 10px 30px oklch(0 0 0 / 0.26);
+  --ui-shadow-interactive: 0 10px 24px oklch(0 0 0 / 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-color-scheme]) {
+    --background: oklch(0.15 0.008 255);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.21 0.01 255);
+    --card-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.82 0.075 255);
+    --primary-foreground: oklch(0.205 0 0);
+    --secondary: oklch(0.285 0.018 255);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.245 0.012 255);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.33 0.04 245);
+    --accent-foreground: oklch(0.985 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.72 0.08 252);
+    --ui-shadow-surface: 0 10px 30px oklch(0 0 0 / 0.26);
+    --ui-shadow-interactive: 0 10px 24px oklch(0 0 0 / 0.3);
+  }
 }
 
 @media (prefers-contrast: more) {
   :root:not([data-contrast]) {
-    --border: color-mix(in srgb, currentColor 48%, transparent);
-    --muted: color-mix(in srgb, currentColor 90%, transparent);
+    --border: color-mix(in oklch, var(--foreground) 48%, transparent);
+    --text-muted: color-mix(in oklch, var(--foreground) 90%, transparent);
   }
 }
 
 @media (prefers-contrast: less) {
   :root:not([data-contrast]) {
-    --border: color-mix(in srgb, currentColor 12%, transparent);
-    --muted: color-mix(in srgb, currentColor 62%, transparent);
+    --border: color-mix(in oklch, var(--foreground) 12%, transparent);
+    --text-muted: color-mix(in oklch, var(--foreground) 62%, transparent);
   }
 }
 
 :root[data-contrast="normal"] {
-  --border: color-mix(in srgb, currentColor 18%, transparent);
-  --muted: color-mix(in srgb, currentColor 68%, transparent);
+  --text-muted: var(--muted-foreground);
 }
 
 :root[data-contrast="high"] {
-  --border: color-mix(in srgb, currentColor 52%, transparent);
-  --muted: color-mix(in srgb, currentColor 92%, transparent);
+  --border: color-mix(in oklch, var(--foreground) 52%, transparent);
+  --text-muted: color-mix(in oklch, var(--foreground) 92%, transparent);
 }
 
 :root[data-contrast="low"] {
-  --border: color-mix(in srgb, currentColor 12%, transparent);
-  --muted: color-mix(in srgb, currentColor 62%, transparent);
+  --border: color-mix(in oklch, var(--foreground) 12%, transparent);
+  --text-muted: color-mix(in oklch, var(--foreground) 62%, transparent);
 }
 
 * {
@@ -53,12 +124,14 @@
 
 body {
   margin: 0;
-  background: Canvas;
-  color: CanvasText;
+  background:
+    radial-gradient(circle at 50% -20rem, color-mix(in oklch, var(--primary) 10%, transparent), transparent 36rem),
+    var(--background);
+  color: var(--foreground);
 }
 
 a {
-  color: var(--accent);
+  color: var(--primary);
   text-underline-offset: 0.18em;
 }
 
@@ -66,7 +139,7 @@ a:focus-visible,
 button:focus-visible,
 select:focus-visible,
 summary:focus-visible {
-  outline: 3px solid Highlight;
+  outline: var(--ui-focus-ring-width) solid var(--ring);
   outline-offset: 3px;
 }
 
@@ -83,20 +156,20 @@ select {
 
 button {
   border: 1px solid var(--border);
-  border-radius: 0.45rem;
+  border-radius: var(--ui-radius-control);
   padding: 0.55rem 0.75rem;
-  background: var(--surface);
-  color: CanvasText;
+  background: var(--surface-muted);
+  color: var(--foreground);
   cursor: pointer;
 }
 
 select {
   width: 100%;
   border: 1px solid var(--border);
-  border-radius: 0.45rem;
+  border-radius: var(--ui-radius-control);
   padding: 0.5rem 2.25rem 0.5rem 0.65rem;
-  background: Canvas;
-  color: CanvasText;
+  background: var(--background);
+  color: var(--foreground);
 }
 
 .skip-link {
@@ -105,7 +178,7 @@ select {
   top: -5rem;
   z-index: 20;
   padding: 0.65rem 0.9rem;
-  background: Canvas;
+  background: var(--background);
   border: 1px solid var(--border);
 }
 
@@ -127,7 +200,8 @@ select {
 
 .site-header {
   border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, Canvas 96%, transparent);
+  background: color-mix(in oklch, var(--background) 88%, transparent);
+  box-shadow: 0 1px 0 color-mix(in oklch, var(--foreground) 3%, transparent);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -152,7 +226,8 @@ select {
   min-width: 0;
   overflow: hidden;
   font-weight: 760;
-  color: CanvasText;
+  letter-spacing: -0.015em;
+  color: var(--foreground);
   text-decoration: none;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -191,14 +266,16 @@ select {
 }
 
 .site-nav a {
-  color: var(--muted);
+  color: var(--text-muted);
   text-decoration: none;
 }
 
 .site-nav a[aria-current="page"] {
-  color: CanvasText;
-  text-decoration: underline;
-  text-decoration-thickness: 2px;
+  color: var(--foreground);
+  background: var(--surface-muted);
+  border-radius: var(--ui-radius-control);
+  padding: 0.3rem 0.55rem;
+  text-decoration: none;
 }
 
 :root[data-contrast="high"] .site-nav a {
@@ -215,12 +292,12 @@ select {
   display: inline-flex;
   align-items: center;
   cursor: pointer;
-  color: var(--muted);
+  color: var(--text-muted);
   list-style-position: inside;
 }
 
 .site-preferences[open] > summary {
-  color: CanvasText;
+  color: var(--foreground);
 }
 
 .site-preferences__panel {
@@ -230,9 +307,9 @@ select {
   width: min(22rem, calc(100vw - 2rem));
   padding: 1rem;
   border: 1px solid var(--border);
-  border-radius: 0.65rem;
-  background: Canvas;
-  box-shadow: 0 0.75rem 2rem color-mix(in srgb, CanvasText 14%, transparent);
+  border-radius: var(--ui-radius-overlay);
+  background: var(--background);
+  box-shadow: var(--ui-shadow-interactive);
 }
 
 .site-preferences__form {
@@ -290,19 +367,25 @@ h2 {
 
 .content-section {
   margin-top: 1.5rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--border);
+  padding: clamp(1rem, 2.5vw, 1.35rem);
+  border: 1px solid var(--border);
+  border-radius: var(--ui-radius-surface);
+  background: color-mix(in oklch, var(--card) 96%, transparent);
+  box-shadow: var(--ui-shadow-surface);
 }
 
 .status-line,
 .muted,
 small {
-  color: var(--muted);
+  color: var(--text-muted);
 }
 
 .table-scroll {
   overflow-x: auto;
   margin-top: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--ui-radius-surface);
+  background: var(--background);
 }
 
 table {
@@ -324,7 +407,8 @@ th {
 }
 
 thead th {
-  color: var(--muted);
+  color: var(--text-muted);
+  background: var(--surface-muted);
   font-size: 0.78rem;
   letter-spacing: 0.055em;
   text-transform: uppercase;
@@ -370,9 +454,9 @@ td[data-state="failed"] {
   justify-content: center;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--ui-radius-pill);
   background: transparent;
-  color: CanvasText;
+  color: var(--foreground);
   text-decoration: none;
 }
 
@@ -380,12 +464,12 @@ td[data-state="failed"] {
 .quick-control:focus-visible,
 .quick-control--language:focus-within {
   border-color: var(--border);
-  background: var(--surface);
+  background: var(--surface-muted);
 }
 
 .quick-control[aria-current="page"] {
   border-color: var(--border);
-  background: var(--surface);
+  background: var(--surface-muted);
 }
 
 .quick-control__icon {
@@ -403,10 +487,10 @@ td[data-state="failed"] {
   width: 2.15rem;
   height: 1.2rem;
   border: 1px solid var(--border);
-  border-radius: 999px;
-  background: color-mix(in srgb, CanvasText 8%, Canvas);
+  border-radius: var(--ui-radius-pill);
+  background: color-mix(in oklch, var(--foreground) 8%, var(--background));
   direction: ltr;
-  transition: background-color 120ms ease;
+  transition: background-color var(--ui-motion-duration-fast) var(--ui-motion-ease-standard);
 }
 
 .theme-toggle__thumb {
@@ -416,12 +500,12 @@ td[data-state="failed"] {
   width: 0.82rem;
   height: 0.82rem;
   border-radius: 50%;
-  background: CanvasText;
-  transition: transform 120ms ease;
+  background: var(--foreground);
+  transition: transform var(--ui-motion-duration-fast) var(--ui-motion-ease-standard);
 }
 
 .theme-toggle[data-theme-state="dark"] .theme-toggle__track {
-  background: color-mix(in srgb, CanvasText 24%, Canvas);
+  background: color-mix(in oklch, var(--foreground) 24%, var(--background));
 }
 
 .theme-toggle[data-theme-state="dark"] .theme-toggle__thumb {
@@ -451,15 +535,17 @@ td[data-state="failed"] {
 }
 
 .quick-control--language:focus-within {
-  outline: 3px solid Highlight;
+  outline: var(--ui-focus-ring-width) solid var(--ring);
   outline-offset: 3px;
 }
 
 .preferences-page {
   max-width: 42rem;
   margin-top: 0;
-  padding-top: 0;
-  border-top: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .preferences-page__form {
@@ -505,15 +591,15 @@ td[data-state="failed"] {
     align-items: center;
     justify-content: center;
     border: 1px solid transparent;
-    border-radius: 999px;
-    color: CanvasText;
+    border-radius: var(--ui-radius-pill);
+    color: var(--foreground);
     cursor: pointer;
   }
 
   .site-navigation[open] > .site-menu-toggle,
   .site-menu-toggle:hover {
     border-color: var(--border);
-    background: var(--surface);
+    background: var(--surface-muted);
   }
 
   .site-navigation:not([open]) > .site-nav {
@@ -532,9 +618,9 @@ td[data-state="failed"] {
     gap: 0.1rem;
     padding: 0.4rem;
     border: 1px solid var(--border);
-    border-radius: 0.65rem;
-    background: Canvas;
-    box-shadow: 0 0.75rem 2rem color-mix(in srgb, CanvasText 14%, transparent);
+    border-radius: var(--ui-radius-overlay);
+    background: var(--background);
+    box-shadow: var(--ui-shadow-interactive);
   }
 
   .site-nav a {
@@ -543,7 +629,7 @@ td[data-state="failed"] {
   }
 
   .site-nav a:hover {
-    background: var(--surface);
+    background: var(--surface-muted);
   }
 
   .site-quick-preferences {
@@ -584,4 +670,23 @@ td[data-state="failed"] {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+tbody tr {
+  transition: background-color var(--ui-motion-duration-fast) var(--ui-motion-ease-standard);
+}
+
+tbody tr:hover {
+  background: color-mix(in oklch, var(--accent) 42%, transparent);
+}
+
+.site-preferences__panel,
+.site-navigation[open] > .site-nav {
+  border-color: var(--border);
+  background: var(--card);
+}
+
+button:hover,
+.quick-control:hover {
+  border-color: var(--input);
 }
