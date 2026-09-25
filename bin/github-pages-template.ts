@@ -499,12 +499,18 @@ function renderPage(config: any, page: string): string {
       <div class="site-header__inner">
         <a class="site-brand" href="${project.basePath}">${escapeHtml(project.name)}</a>
         <div class="site-header__actions">
-          <nav class="site-nav" aria-label="${t("nav.project")}" data-i18n-aria-label="nav.project">
+          <details class="site-navigation">
+            <summary class="site-menu-toggle">
+              ${icon("menu")}
+              <span class="visually-hidden" data-i18n="nav.menu">${t("nav.menu")}</span>
+            </summary>
+            <nav class="site-nav" aria-label="${t("nav.project")}" data-i18n-aria-label="nav.project">
             ${navLink(translate(config, locale, "nav.overview"), project.basePath, page === "overview", "nav.overview")}
             ${navLink(translate(config, locale, "nav.stats"), `${project.basePath}stats/`, page === "stats", "nav.stats")}
             ${navLink(translate(config, locale, "nav.evidence"), `${project.basePath}evidence/`, page === "evidence", "nav.evidence")}
             ${(config.links ?? []).map((link: any) => navLink(link.label, link.href, false)).join("\n            ")}
-          </nav>
+            </nav>
+          </details>
           ${renderHeaderPreferences(config, locale, page)}
         </div>
       </div>
@@ -513,8 +519,7 @@ function renderPage(config: any, page: string): string {
       ${body}
     </main>
     <footer class="site-footer">
-      <span data-i18n="footer.evidence">${t("footer.evidence")}</span>
-      <a href="https://github.com/${escapeHtml(project.repository)}" data-i18n="footer.repository">${t("footer.repository")}</a>
+<a href="https://github.com/${escapeHtml(project.repository)}" data-i18n="footer.repository">${t("footer.repository")}</a>
     </footer>
     <script>window.__PROJECT_PAGES_CONFIG__ = ${configJson};</script>
     <script type="module" src="${project.basePath}assets/site-runtime.js"></script>
@@ -535,25 +540,25 @@ function renderPreferenceBootstrap(config: any): string {
 function renderHeaderPreferences(config: any, locale: string, page: string): string {
   const defaults = preferenceDefaults(config);
   const initialTheme = defaults[COLOR_SCHEME_SETTING_ID] === "dark" ? "dark" : "light";
+  const initialLocale = defaults[LOCALE_SETTING_ID];
   const t = (key: string) => escapeHtml(translate(config, locale, key));
   return `<div class="site-quick-preferences">
-            <button class="quick-control theme-toggle" type="button" data-preference-action="toggle-color-scheme" data-theme-state="${initialTheme}" aria-pressed="${initialTheme === "dark" ? "true" : "false"}">
-              <span class="quick-control__category" data-i18n="preferences.theme">${t("preferences.theme")}</span>
-              <span class="theme-toggle__state theme-toggle__light">${icon("sun")}<span data-i18n="preferences.theme.light">${t("preferences.theme.light")}</span></span>
-              <span class="theme-toggle__state theme-toggle__dark">${icon("moon")}<span data-i18n="preferences.theme.dark">${t("preferences.theme.dark")}</span></span>
+            <button class="quick-control quick-control--theme theme-toggle" type="button" data-preference-action="toggle-color-scheme" data-theme-state="${initialTheme}" aria-pressed="${initialTheme === "dark" ? "true" : "false"}">
+              <span class="theme-toggle__track" aria-hidden="true"><span class="theme-toggle__thumb"></span></span>
+              <span class="visually-hidden" data-i18n="preferences.theme">${t("preferences.theme")}</span>
             </button>
             <label class="quick-control quick-control--language">
-              ${icon("globe")}
-              <span class="quick-control__category" data-i18n="preferences.language">${t("preferences.language")}</span>
-              <select data-preference-id="${LOCALE_SETTING_ID}">
+              <span class="language-flag" data-language-flag aria-hidden="true">${localeFlag(initialLocale)}</span>
+              <span class="visually-hidden" data-i18n="preferences.language">${t("preferences.language")}</span>
+              <select data-preference-id="${LOCALE_SETTING_ID}" aria-label="${t("preferences.language")}" data-i18n-aria-label="preferences.language">
                 ${configuredLocales(config)
-                  .map((item) => preferenceOption(item.id, defaults[LOCALE_SETTING_ID], escapeHtml(item.label)))
+                  .map((item) => preferenceOption(item.id, defaults[LOCALE_SETTING_ID], escapeHtml(item.label), null, localeFlag(item.id)))
                   .join("\n                ")}
               </select>
             </label>
-            <a class="quick-control quick-control--link" href="${config.project.basePath}preferences/"${page === "preferences" ? ' aria-current="page"' : ""}>
+            <a class="quick-control quick-control--link quick-control--icon" href="${config.project.basePath}preferences/"${page === "preferences" ? ' aria-current="page"' : ""}>
               ${icon("settings")}
-              <span data-i18n="preferences.summary">${t("preferences.summary")}</span>
+              <span class="visually-hidden" data-i18n="preferences.summary">${t("preferences.summary")}</span>
             </a>
           </div>`;
 }
@@ -564,7 +569,6 @@ function renderPreferenceMenu(config: any, locale: string): string {
   return `<details class="site-preferences">
             <summary data-i18n="preferences.summary">${t("preferences.summary")}</summary>
             <div class="site-preferences__panel">
-              <p class="site-preferences__description" data-i18n="preferences.description">${t("preferences.description")}</p>
               <form id="site-preferences-form" class="site-preferences__form">
                 <label>
                   <span data-i18n="preferences.theme">${t("preferences.theme")}</span>
@@ -600,12 +604,8 @@ function renderPreferenceMenu(config: any, locale: string): string {
 function renderPreferencesPage(config: any, locale: string): string {
   const defaults = preferenceDefaults(config);
   const t = (key: string) => escapeHtml(translate(config, locale, key));
-  return `<section class="page-heading preferences-heading">
-        <h1 data-i18n="preferences.summary">${t("preferences.summary")}</h1>
-        <p data-i18n="preferences.description">${t("preferences.description")}</p>
-      </section>
-      <section class="content-section preferences-page" aria-labelledby="preferences-form-title">
-        <h2 id="preferences-form-title" data-i18n="preferences.summary">${t("preferences.summary")}</h2>
+  return `<section class="content-section preferences-page" aria-labelledby="preferences-title">
+        <h1 id="preferences-title" data-i18n="preferences.summary">${t("preferences.summary")}</h1>
         <form id="site-preferences-form" class="preferences-page__form">
           <label class="preferences-page__field">
             <span data-i18n="preferences.theme">${t("preferences.theme")}</span>
@@ -642,41 +642,37 @@ function preferenceOption(
   selected: string,
   label: string,
   messageKey: string | null = null,
+  dataFlag: string | null = null,
 ): string {
-  return `<option value="${escapeHtml(value)}"${value === selected ? " selected" : ""}${messageKey ? ` data-i18n="${messageKey}"` : ""}>${label}</option>`;
+  return `<option value="${escapeHtml(value)}"${value === selected ? " selected" : ""}${messageKey ? ` data-i18n="${messageKey}"` : ""}${dataFlag ? ` data-flag="${escapeHtml(dataFlag)}"` : ""}>${label}</option>`;
 }
 
 function renderOverview(config: any, locale: string): string {
   const project = config.project;
   const t = (key: string) => escapeHtml(translate(config, locale, key));
-  return `<section class="hero" aria-labelledby="project-title">
-        <p class="eyebrow">${escapeHtml(project.kicker ?? project.repository)}</p>
-        <h1 id="project-title">${escapeHtml(project.name)}</h1>
-        <p class="lede">${escapeHtml(project.description ?? "")}</p>
-        <div class="hero-links">
-          ${(config.links ?? []).map((link: any) => `<a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a>`).join("\n          ")}
+  return `<section class="overview-actions" aria-labelledby="overview-title">
+        <h1 id="overview-title" data-i18n="overview.evidenceTitle">${t("overview.evidenceTitle")}</h1>
+        <div class="overview-links">
+          <a href="${project.basePath}stats/" data-i18n="overview.viewStats">${t("overview.viewStats")}</a>
+          <a href="${project.basePath}evidence/" data-i18n="overview.inspectEvidence">${t("overview.inspectEvidence")}</a>
         </div>
-      </section>
-      <section class="content-section" aria-labelledby="evidence-summary-title">
-        <h2 id="evidence-summary-title" data-i18n="overview.evidenceTitle">${t("overview.evidenceTitle")}</h2>
-        <p data-i18n="overview.evidenceBody">${t("overview.evidenceBody")}</p>
-        <p><a href="${project.basePath}stats/" data-i18n="overview.viewStats">${t("overview.viewStats")}</a> · <a href="${project.basePath}evidence/" data-i18n="overview.inspectEvidence">${t("overview.inspectEvidence")}</a></p>
       </section>`;
 }
 
 function renderEvidenceSurface(config: any, page: string, locale: string): string {
   const t = (key: string) => escapeHtml(translate(config, locale, key));
   if (page === "stats") {
-    return `<section class="page-heading"><p class="eyebrow" data-i18n="stats.eyebrow">${t("stats.eyebrow")}</p><h1 data-i18n="stats.title">${t("stats.title")}</h1><p data-i18n="stats.intro">${t("stats.intro")}</p></section>
+    return `<section class="page-heading"><h1 data-i18n="stats.title">${t("stats.title")}</h1></section>
       <section class="content-section" aria-labelledby="stats-title"><h2 id="stats-title" data-i18n="stats.currentTitle">${t("stats.currentTitle")}</h2><div id="stats-status" class="status-line" aria-live="polite" data-i18n="stats.loading">${t("stats.loading")}</div><div class="table-scroll"><table><thead><tr><th scope="col" data-i18n="stats.table.metric">${t("stats.table.metric")}</th><th scope="col" data-i18n="stats.table.value">${t("stats.table.value")}</th><th scope="col" data-i18n="stats.table.state">${t("stats.table.state")}</th><th scope="col" data-i18n="stats.table.source">${t("stats.table.source")}</th></tr></thead><tbody id="stats-table"></tbody></table></div></section>
       <section class="content-section" aria-labelledby="accomplishments-title"><h2 id="accomplishments-title" data-i18n="stats.accomplishmentsTitle">${t("stats.accomplishmentsTitle")}</h2><div id="accomplishments"></div></section>`;
   }
-  return `<section class="page-heading"><p class="eyebrow" data-i18n="evidence.eyebrow">${t("evidence.eyebrow")}</p><h1 data-i18n="evidence.title">${t("evidence.title")}</h1><p data-i18n="evidence.intro">${t("evidence.intro")}</p></section>
+  return `<section class="page-heading"><h1 data-i18n="evidence.title">${t("evidence.title")}</h1></section>
       <section class="content-section"><div id="evidence-status" class="status-line" aria-live="polite" data-i18n="evidence.loading">${t("evidence.loading")}</div><div class="table-scroll"><table><thead><tr><th scope="col" data-i18n="evidence.table.source">${t("evidence.table.source")}</th><th scope="col" data-i18n="evidence.table.repository">${t("evidence.table.repository")}</th><th scope="col" data-i18n="evidence.table.producer">${t("evidence.table.producer")}</th><th scope="col" data-i18n="evidence.table.state">${t("evidence.table.state")}</th><th scope="col" data-i18n="evidence.table.generated">${t("evidence.table.generated")}</th><th scope="col" data-i18n="evidence.table.evidenceRevision">${t("evidence.table.evidenceRevision")}</th><th scope="col" data-i18n="evidence.table.currentRevision">${t("evidence.table.currentRevision")}</th><th scope="col" data-i18n="evidence.table.diagnostic">${t("evidence.table.diagnostic")}</th></tr></thead><tbody id="evidence-table"></tbody></table></div></section>`;
 }
 
 function icon(name: string): string {
   const paths: Record<string, string> = {
+    menu: '<path d="M4 7h16M4 12h16M4 17h16"></path>',
     sun: '<circle cx="12" cy="12" r="3.5"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"></path>',
     moon: '<path d="M20.5 14.1A8.5 8.5 0 0 1 9.9 3.5 8.5 8.5 0 1 0 20.5 14.1Z"></path>',
     globe: '<circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3a14.5 14.5 0 0 1 0 18M12 3a14.5 14.5 0 0 0 0 18"></path>',
@@ -684,6 +680,34 @@ function icon(name: string): string {
   };
   const path = paths[name];
   return `<svg class="quick-control__icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${path ?? ""}</svg>`;
+}
+
+function localeFlag(locale: string): string {
+  const parts = String(locale).replaceAll("_", "-").split("-");
+  const language = (parts[0] ?? "").toLowerCase();
+  const explicitRegion = parts.slice(1).find((part) => /^[A-Za-z]{2}$/.test(part));
+  const defaultRegions: Record<string, string> = {
+    ar: "SA",
+    de: "DE",
+    en: "GB",
+    es: "ES",
+    fr: "FR",
+    he: "IL",
+    it: "IT",
+    ja: "JP",
+    ko: "KR",
+    nl: "NL",
+    pl: "PL",
+    pt: "PT",
+    ru: "RU",
+    sv: "SE",
+    tr: "TR",
+    uk: "UA",
+    zh: "CN",
+  };
+  const region = (explicitRegion ?? defaultRegions[language])?.toUpperCase();
+  if (!region) return "🌐";
+  return String.fromCodePoint(...[...region].map((letter) => 0x1f1e6 + letter.charCodeAt(0) - 65));
 }
 
 function navLink(
