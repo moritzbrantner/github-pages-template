@@ -62,7 +62,7 @@
     "verify:release": "npm run build && node --test ./tests/*.test.ts && node ./build/bin/github-pages-template.js build --config ./site/pages.config.json --out ./dist && node ./scripts/verify-package.ts && node ./scripts/verify-packed-consumer.ts && node ./scripts/verify-release.ts"
   },
   "devDependencies": {
-    "@types/node": "24.13.6",
+    "@types/node": "26.6.3",
     "typescript": "7.0.2"
   },
   "engines": {
