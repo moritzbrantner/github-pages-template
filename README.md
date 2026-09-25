@@ -91,6 +91,10 @@ See [`docs/consumer-adoption.md`](docs/consumer-adoption.md) for the full consum
   "links": [
     { "label": "Demo", "href": "/maps/" }
   ],
+  "relatedRepositories": [
+    "moritzbrantner/2d-lab",
+    "moritzbrantner/maps"
+  ],
   "agent": {
     "routes": [
       {
@@ -119,6 +123,8 @@ See [`docs/consumer-adoption.md`](docs/consumer-adoption.md) for the full consum
 ```
 
 See [`docs/project-evidence-v1.md`](docs/project-evidence-v1.md) for the producer-neutral evidence contract.
+
+`relatedRepositories` is optional. When present, the full-mode overview renders the repositories as a compact link list and exposes the same GitHub URLs in `agent.json`; augment mode continues to leave the consumer-owned homepage untouched.
 
 ## Agent discovery
 
