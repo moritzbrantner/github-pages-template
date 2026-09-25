@@ -93,7 +93,7 @@ See [`docs/consumer-adoption.md`](docs/consumer-adoption.md) for the full consum
   ],
   "relatedRepositories": [
     "moritzbrantner/2d-lab",
-    "moritzbrantner/maps"
+    "moritzbrantner/charts"
   ],
   "agent": {
     "routes": [
