@@ -21,6 +21,7 @@
     "project-template"
   ],
   "files": [
+    "bin/github-pages-template.mjs",
     "build/bin",
     "build/src",
     "src/site.css",
@@ -30,7 +31,7 @@
     "VERSION"
   ],
   "bin": {
-    "github-pages-template": "./build/bin/github-pages-template.js"
+    "github-pages-template": "./bin/github-pages-template.mjs"
   },
   "exports": {
     "./runtime": {
@@ -47,16 +48,12 @@
     },
     "./styles.css": "./src/site.css"
   },
-  "publishConfig": {
-    "registry": "https://registry.npmjs.org",
-    "access": "public"
-  },
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "build:site": "npm run build && node ./build/bin/github-pages-template.js build --config ./site/pages.config.json --out ./dist",
     "pack:check": "npm run build && node ./scripts/verify-package.ts && node ./scripts/verify-packed-consumer.ts",
     "prepack": "npm run build",
-    "prepublishOnly": "npm run verify:release",
+    "prepare": "node ./scripts/prepare-git-install.mjs",
     "test": "npm run build && node --test ./tests/*.test.ts",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "verify:release": "npm run build && node --test ./tests/*.test.ts && node ./build/bin/github-pages-template.js build --config ./site/pages.config.json --out ./dist && node ./scripts/verify-package.ts && node ./scripts/verify-packed-consumer.ts && node ./scripts/verify-release.ts"

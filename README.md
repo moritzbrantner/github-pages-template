@@ -33,7 +33,7 @@ npm run verify:release
 ```
 
 The CLI, browser runtime, tests, and verification scripts are authored in TypeScript. The
-published package contains compiled JavaScript and generated declarations for consumers.
+installed package contains compiled JavaScript and generated declarations for consumers.
 
 ## One-time GitHub Pages activation
 
@@ -43,13 +43,13 @@ The included deployment workflow preflights the Pages API. Before that one-time 
 
 ## Adopt in an existing project site
 
-Use the public npm package as the canonical dependency:
+The package is not published to npm. Add it as a commit-pinned git dependency (the `prepare` script builds it on install; see [`docs/consumer-adoption.md`](docs/consumer-adoption.md) for bun and npm script-approval details):
 
 ```sh
-npm install --save-dev @moritzbrantner/github-pages-template
+npm install --save-dev "git+https://github.com/moritzbrantner/github-pages-template.git#<commit-sha>"
 ```
 
-Commit the consumer lockfile so the build retains an exact resolved artifact and integrity hash. Renovate can then update the normal package dependency without maintaining repository-specific `git fetch` snippets.
+Commit the consumer lockfile so the build retains the exact pinned commit, without repository-specific `git fetch` snippets.
 
 Add a `pages.config.json`, build the project's existing static site, then augment that output:
 
@@ -159,9 +159,9 @@ The renderer is fail-closed:
 
 ## Releases
 
-`@moritzbrantner/github-pages-template` is published publicly to npm from version-matched `v*` tags. The tag workflow verifies the package payload, is safe to rerun when an npm version already exists, and creates the corresponding GitHub Release.
+`@moritzbrantner/github-pages-template` is not published to npm. Consumers pin a commit as a git dependency; the `prepare` script builds the package on install.
 
-See [`docs/releasing.md`](docs/releasing.md) for the first-publish bootstrap and normal trusted-publishing flow.
+See [`docs/releasing.md`](docs/releasing.md) for versioning and the consumer update flow.
 
 ## Ownership boundaries
 

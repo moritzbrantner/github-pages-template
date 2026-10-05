@@ -7,9 +7,9 @@ const packageJson = JSON.parse(await readFile(new URL("../package.json", import.
 assert.equal(packageJson.name, "@moritzbrantner/github-pages-template");
 assert.equal(packageJson.private, false);
 assert.equal(packageJson.repository?.url, "git+https://github.com/moritzbrantner/github-pages-template.git");
-assert.equal(packageJson.publishConfig?.registry, "https://registry.npmjs.org");
-assert.equal(packageJson.publishConfig?.access, "public");
-assert.equal(packageJson.bin?.["github-pages-template"], "./build/bin/github-pages-template.js");
+assert.equal(packageJson.publishConfig, undefined, "the package is not published to a registry");
+assert.equal(packageJson.scripts?.prepare, "node ./scripts/prepare-git-install.mjs");
+assert.equal(packageJson.bin?.["github-pages-template"], "./bin/github-pages-template.mjs");
 assert.equal(packageJson.exports?.["./preferences"]?.import, "./build/src/site-preferences.js");
 assert.equal(packageJson.exports?.["./preferences"]?.types, "./build/src/site-preferences.d.ts");
 assert.equal(packageJson.exports?.["./localization"]?.import, "./build/src/site-localization.js");
@@ -34,6 +34,7 @@ for (const path of [
   "README.md",
   "LICENSE",
   "VERSION",
+  "bin/github-pages-template.mjs",
   "build/bin/github-pages-template.js",
   "build/src/site-runtime.js",
   "build/src/site-runtime.d.ts",
@@ -63,5 +64,5 @@ for (const path of files) {
 }
 
 console.log(
-  `Verified ${packageJson.name}@${packageJson.version}: ${files.size} publishable files, public npm metadata, no repository-only output.`,
+  `Verified ${packageJson.name}@${packageJson.version}: ${files.size} packaged files, git-install prepare build, no repository-only output.`,
 );
