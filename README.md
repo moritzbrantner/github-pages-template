@@ -43,13 +43,13 @@ The included deployment workflow preflights the Pages API. Before that one-time 
 
 ## Adopt in an existing project site
 
-Use the public npm package as the canonical dependency:
+The package is not published to npm. Add it as a commit-pinned git dependency (the `prepare` script builds it on install; see [`docs/consumer-adoption.md`](docs/consumer-adoption.md) for bun and npm script-approval details):
 
 ```sh
-npm install --save-dev @moritzbrantner/github-pages-template
+npm install --save-dev "git+https://github.com/moritzbrantner/github-pages-template.git#<commit-sha>"
 ```
 
-Commit the consumer lockfile so the build retains an exact resolved artifact and integrity hash. Renovate can then update the normal package dependency without maintaining repository-specific `git fetch` snippets.
+Commit the consumer lockfile so the build retains the exact pinned commit, without repository-specific `git fetch` snippets.
 
 Add a `pages.config.json`, build the project's existing static site, then augment that output:
 

@@ -12,6 +12,14 @@ npm install --save-dev "git+https://github.com/moritzbrantner/github-pages-templ
 bun add --dev --trust "@moritzbrantner/github-pages-template@git+https://github.com/moritzbrantner/github-pages-template.git#<commit-sha>"
 ```
 
+If your npm configuration enforces install-script approval and skipped the package's `prepare` build (`node_modules/@moritzbrantner/github-pages-template/build/` is missing), approve it and reinstall:
+
+```sh
+npm approve-scripts @moritzbrantner/github-pages-template
+rm -rf node_modules/@moritzbrantner/github-pages-template
+npm install
+```
+
 Commit the resulting lockfile. The pinned commit is the update surface. Do not keep custom `git fetch` logic in consumer workflows; use the dependency instead.
 
 ## Build integration
