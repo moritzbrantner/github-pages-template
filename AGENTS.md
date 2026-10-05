@@ -25,8 +25,7 @@
 
 ## Distribution
 
-- Public npm package `@moritzbrantner/github-pages-template` is the canonical released consumer surface.
-- Keep `package.json` and `VERSION` synchronized and require release tags to match `v<version>` exactly.
-- Validate the real npm pack payload before publishing; repository-only tests, workflows, scripts, reference-site input, and generated reference output must not leak into the package.
-- Prefer npm trusted publishing with provenance. A long-lived `NPM_TOKEN` is only an initial-package bootstrap fallback and should be removed after trusted publishing is established.
-- Consumer repositories should use the package dependency plus their lockfile and Renovate rather than permanent repository-specific source-fetch logic.
+- The package is not published to npm. Consumers depend on a commit-pinned git dependency (`git+https://github.com/moritzbrantner/github-pages-template.git#<sha>`); the `prepare` script builds it on install. Do not add npm publishing, registry tokens, or other repository secrets.
+- Keep `package.json` and `VERSION` synchronized; version tags, when used, must match `v<version>` exactly.
+- Validate the real `npm pack` payload; repository-only tests, workflows, scripts, reference-site input, and generated reference output must not leak into the package.
+- Consumer repositories should use the package dependency plus their lockfile rather than permanent repository-specific source-fetch logic.

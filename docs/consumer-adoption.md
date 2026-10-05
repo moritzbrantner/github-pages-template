@@ -4,15 +4,15 @@ A consuming repository should keep its project-specific demo or documentation ho
 
 ## Canonical dependency
 
-Released consumers should install the public npm package rather than cloning this repository during CI:
+The package is not published to npm. Consumers install a commit-pinned git dependency rather than cloning this repository during CI:
 
 ```sh
-npm install --save-dev @moritzbrantner/github-pages-template
+npm install --save-dev "git+https://github.com/moritzbrantner/github-pages-template.git#<commit-sha>"
+# or, with bun (--trust lets bun run the package's prepare build):
+bun add --dev --trust "@moritzbrantner/github-pages-template@git+https://github.com/moritzbrantner/github-pages-template.git#<commit-sha>"
 ```
 
-Use the repository's normal package manager when it is not npm, and commit the resulting lockfile. The package version is the update surface; the lockfile preserves the exact resolved package artifact and integrity hash. Renovate should update this dependency like other package dependencies.
-
-A direct Git revision is acceptable only as a short-lived integration path for an unreleased template change. Do not leave permanent custom `git fetch` logic in consumer workflows once that change has a package release.
+Commit the resulting lockfile. The pinned commit is the update surface. Do not keep custom `git fetch` logic in consumer workflows; use the dependency instead.
 
 ## Build integration
 
