@@ -18,7 +18,8 @@ const buildOutputs = ["build"];
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 function npm(args, cwd) {
-  execFileSync("npm", args, { cwd, stdio: "inherit" });
+  // npm is `npm.cmd` on Windows, which execFile can only start through a shell.
+  execFileSync("npm", args, { cwd, stdio: "inherit", shell: process.platform === "win32" });
 }
 
 if (packageRoot.split(path.sep).includes("node_modules")) {
