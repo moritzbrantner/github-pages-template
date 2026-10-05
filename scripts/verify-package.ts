@@ -8,7 +8,7 @@ assert.equal(packageJson.name, "@moritzbrantner/github-pages-template");
 assert.equal(packageJson.private, false);
 assert.equal(packageJson.repository?.url, "git+https://github.com/moritzbrantner/github-pages-template.git");
 assert.equal(packageJson.publishConfig, undefined, "the package is not published to a registry");
-assert.equal(packageJson.scripts?.prepare, "node ./scripts/prepare-git-install.ts");
+assert.equal(packageJson.scripts?.prepare, "node ./scripts/prepare-git-install.mjs");
 assert.equal(packageJson.bin?.["github-pages-template"], "./build/bin/github-pages-template.js");
 assert.equal(packageJson.exports?.["./preferences"]?.import, "./build/src/site-preferences.js");
 assert.equal(packageJson.exports?.["./preferences"]?.types, "./build/src/site-preferences.d.ts");

@@ -1,3 +1,4 @@
+// Plain JavaScript: Node does not strip TypeScript types for files below node_modules.
 // The `prepare` script. It only acts when the package sits below node_modules, which is where
 // bun places a consumer's commit-pinned git dependency (listed in `trustedDependencies`).
 // bun does not install a git dependency's devDependencies, so TypeScript is missing there. The
@@ -14,7 +15,7 @@ import { fileURLToPath } from "node:url";
 const buildOutputs = ["build"];
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-function npm(args: string[], cwd: string): void {
+function npm(args, cwd) {
   execFileSync("npm", args, { cwd, stdio: "inherit" });
 }
 

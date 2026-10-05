@@ -52,7 +52,7 @@
     "build:site": "npm run build && node ./build/bin/github-pages-template.js build --config ./site/pages.config.json --out ./dist",
     "pack:check": "npm run build && node ./scripts/verify-package.ts && node ./scripts/verify-packed-consumer.ts",
     "prepack": "npm run build",
-    "prepare": "node ./scripts/prepare-git-install.ts",
+    "prepare": "node ./scripts/prepare-git-install.mjs",
     "test": "npm run build && node --test ./tests/*.test.ts",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "verify:release": "npm run build && node --test ./tests/*.test.ts && node ./build/bin/github-pages-template.js build --config ./site/pages.config.json --out ./dist && node ./scripts/verify-package.ts && node ./scripts/verify-packed-consumer.ts && node ./scripts/verify-release.ts"
