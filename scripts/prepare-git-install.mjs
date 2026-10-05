@@ -1,13 +1,15 @@
 // Plain JavaScript: Node does not strip TypeScript types for files below node_modules.
-// The `prepare` script. It only acts when the package sits below node_modules, which is where
-// bun places a consumer's commit-pinned git dependency (listed in `trustedDependencies`).
-// bun does not install a git dependency's devDependencies, so TypeScript is missing there. The
-// build therefore runs in a copy outside node_modules with its own `npm ci`, and only the build
-// output is copied back. npm git installs build through `prepack` in their own clone instead.
-// In a normal checkout it does nothing, so `npm ci` and `npm pack` stay side-effect free.
+// The `prepare` script, which builds the package when it is installed as a commit-pinned git
+// dependency.
+// - bun runs it inside the consumer's node_modules (for packages in `trustedDependencies`)
+//   without the package's devDependencies, so TypeScript is missing there. The build runs in a
+//   copy outside node_modules with its own `npm ci`, and only the build output is copied back.
+// - npm runs it in a temporary clone after installing devDependencies, then packs that clone
+//   without running `prepack`, so the build has to happen here.
+// In a normal checkout it also builds once devDependencies are installed (`npm ci`).
 
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdtempSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,4 +40,6 @@ if (packageRoot.split(path.sep).includes("node_modules")) {
   } finally {
     rmSync(buildRoot, { recursive: true, force: true });
   }
+} else if (existsSync(path.join(packageRoot, "node_modules", "typescript"))) {
+  npm(["run", "build"], packageRoot);
 }

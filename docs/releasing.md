@@ -4,8 +4,11 @@ The package is not published to npm, and no workflow needs a registry token or o
 
 ## Install-time build
 
-- `npm` git installs run `prepack` (`npm run build`) in their own clone with devDependencies installed.
-- `bun` git installs run `prepare` (`scripts/prepare-git-install.mjs`) for trusted dependencies. bun does not install a git dependency's devDependencies, so the script builds in a temporary copy with its own `npm ci` and copies `build/` back. In a normal checkout it does nothing.
+`prepare` (`scripts/prepare-git-install.mjs`) builds the package on install:
+
+- `npm` git installs run it in their own clone with devDependencies installed, then pack that clone. npm 11 also asks consumers to approve the script (`npm approve-scripts`).
+- `bun` git installs run it inside `node_modules` for trusted dependencies. bun does not install a git dependency's devDependencies, so the script builds in a temporary copy with its own `npm ci` and copies `build/` back.
+- In a normal checkout it builds once devDependencies are installed.
 
 ## Release invariants
 
