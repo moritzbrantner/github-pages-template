@@ -62,7 +62,7 @@ jobs:
     if: ${{ needs.pages-preflight.outputs.enabled == 'true' }}
     uses: moritzbrantner/reusable-workflows/.github/workflows/deploy-pages.yml@197a252fcfc3d4a631010c61ef77369f5461365c
     with:
-      node_version: "24"
+      node_version: lts/*
       bun_version: ""
       install_command: "npm ci"
       build_command: "npm run build:site"
